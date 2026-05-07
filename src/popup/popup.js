@@ -12,6 +12,8 @@ class PopupManager {
     document.getElementById('modalClose').addEventListener('click', () => this.closePromptModal());
     document.getElementById('copyPromptBtn').addEventListener('click', () => this.copyPrompt());
     document.getElementById('promptModal').addEventListener('click', e => { if (e.target === e.currentTarget) this.closePromptModal(); });
+    document.getElementById('themeBtn').addEventListener('click', () => this.toggleTheme());
+    this.initTheme();
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
     });
@@ -21,6 +23,20 @@ class PopupManager {
   switchTab(id) {
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === id));
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + id));
+  }
+
+  // ─── THEME ───────────────────────────────────────────────────
+
+  initTheme() {
+    const saved = localStorage.getItem('seo-theme') || 'light';
+    document.documentElement.setAttribute('data-theme', saved);
+  }
+
+  toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = current === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('seo-theme', next);
   }
 
   async requestAnalysis() {
@@ -107,11 +123,22 @@ class PopupManager {
 
   renderSEO() {
     const score = this.calcScore();
+    const cls   = this.scoreClass(score);
+
+    // Number
     const el = document.getElementById('scoreValue');
     el.textContent = score.toFixed(1);
-    el.className = 'score-number ' + this.scoreClass(score);
+    el.className = 'score-number ' + cls;
+
+    // SVG ring — circumference of r=32 is ~201
+    const circ = 201;
+    const arc  = document.getElementById('ringArc');
+    arc.className = 'ring-arc ' + cls;
+    arc.style.strokeDashoffset = (circ * (1 - score / 10)).toFixed(2);
+
+    // Bar (fallback)
     document.getElementById('scoreFill').style.width = (score / 10 * 100) + '%';
-    document.getElementById('scoreFill').className = 'score-fill ' + this.scoreClass(score);
+    document.getElementById('scoreFill').className = 'score-fill ' + cls;
     document.getElementById('scoreMsg').textContent = this.scoreLabel(score);
 
     this.renderMetaTags();
@@ -452,11 +479,19 @@ class PopupManager {
           : (cq.poorAnchorTexts) + ' ancora(s) genericos ("clique aqui", "saiba mais", etc.)' },
     ];
 
-    const icons = { good: '✓', warn: '!', bad: '✕' };
-    document.getElementById('checksContainer').innerHTML = checks.map(c =>
-      '<div class="check-item border-' + c.status + '">' +
-        '<span class="check-icon icon-' + c.status + '">' + icons[c.status] + '</span>' +
-        '<div class="check-body"><strong>' + c.label + '</strong><small>' + c.msg + '</small></div>' +
+    const icons = { good: '&#10003;', warn: '!', bad: '&#10005;' };
+    const grouped = {};
+    checks.forEach(c => { if (!grouped[c.group]) grouped[c.group] = []; grouped[c.group].push(c); });
+
+    document.getElementById('checksContainer').innerHTML = Object.entries(grouped).map(([group, items]) =>
+      '<div class="check-group">' +
+        '<div class="check-group-label">' + group + '</div>' +
+        items.map(c =>
+          '<div class="check-item border-' + c.status + '">' +
+            '<span class="check-icon icon-' + c.status + '">' + icons[c.status] + '</span>' +
+            '<div class="check-body"><strong>' + c.label + '</strong><small>' + c.msg + '</small></div>' +
+          '</div>'
+        ).join('') +
       '</div>'
     ).join('');
   }
