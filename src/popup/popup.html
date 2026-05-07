@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEO Analyzer Pro</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="popup-container">
+
+        <div class="popup-header">
+            <h1>SEO Analyzer</h1>
+            <button id="settingsBtn" class="settings-btn">&#9881;</button>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Analisando pagina...</p>
+        </div>
+
+        <div id="results" class="results" style="display: none;">
+
+            <div class="result-item">
+                <small class="label">URL ANALISADA</small>
+                <p id="urlDisplay" class="url-text"></p>
+            </div>
+
+            <div class="result-item score-card">
+                <h3>Score SEO</h3>
+                <div class="score-circle">
+                    <span id="scoreValue" class="score-number">--</span>
+                    <span class="score-text">/10</span>
+                </div>
+                <p id="scoreMsg" class="score-message"></p>
+            </div>
+
+            <div class="results-section">
+                <h3 class="section-title">Verificacoes</h3>
+
+                <div class="check-item">
+                    <span id="titleCheck" class="check-icon">&#9888;</span>
+                    <div class="check-content">
+                        <strong>Title Tag</strong>
+                        <small id="titleMsg"></small>
+                    </div>
+                </div>
+
+                <div class="check-item">
+                    <span id="descCheck" class="check-icon">&#9888;</span>
+                    <div class="check-content">
+                        <strong>Meta Description</strong>
+                        <small id="descMsg"></small>
+                    </div>
+                </div>
+
+                <div class="check-item">
+                    <span id="h1Check" class="check-icon">&#9888;</span>
+                    <div class="check-content">
+                        <strong>H1 Heading</strong>
+                        <small id="h1Msg"></small>
+                    </div>
+                </div>
+
+                <div class="check-item">
+                    <span id="mobileCheck" class="check-icon">&#9888;</span>
+                    <div class="check-content">
+                        <strong>Mobile Friendly</strong>
+                        <small id="mobileMsg"></small>
+                    </div>
+                </div>
+
+                <div class="check-item">
+                    <span id="httpsCheck" class="check-icon">&#9888;</span>
+                    <div class="check-content">
+                        <strong>HTTPS/SSL</strong>
+                        <small id="httpsMsg"></small>
+                    </div>
+                </div>
+
+                <div class="check-item">
+                    <span id="imagesCheck" class="check-icon">&#9888;</span>
+                    <div class="check-content">
+                        <strong>Image Alt Text</strong>
+                        <small id="imagesMsg"></small>
+                    </div>
+                </div>
+
+                <div class="check-item">
+                    <span id="wordCountCheck" class="check-icon">&#8505;</span>
+                    <div class="check-content">
+                        <strong>Conteudo</strong>
+                        <small id="wordCountMsg"></small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="popup-actions">
+                <button id="exportBtn" class="btn btn-secondary">Exportar JSON</button>
+                <button id="reloadBtn" class="btn btn-primary">Recarregar</button>
+            </div>
+        </div>
+
+        <div id="error" class="error-message" style="display: none;">
+            <p>Erro ao analisar pagina</p>
+            <small id="errorMsg"></small>
+        </div>
+
+    </div>
+
+    <script src="../../dist/popup.js"></script>
+</body>
+</html>

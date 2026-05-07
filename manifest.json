@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "SEO Analyzer Pro",
+  "version": "1.0.0",
+  "description": "Professional SEO analysis. Free basic + Pro advanced features.",
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "dist/background-script.js"
+  },
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "SEO Analyzer Pro",
+    "default_icon": {
+      "16": "public/icons/icon-16.png",
+      "48": "public/icons/icon-48.png",
+      "128": "public/icons/icon-128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["dist/content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "public/icons/icon-16.png",
+    "48": "public/icons/icon-48.png",
+    "128": "public/icons/icon-128.png",
+    "256": "public/icons/icon-256.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["src/report/report.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
