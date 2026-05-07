@@ -2,6 +2,13 @@
    DESIGN TOKENS — Light
 ═══════════════════════════════════════════════════ */
 :root {
+  /* Empilhamento maximo dentro da janela do popup (nao afeta a pagina do site). */
+  --z-popup-layer: 2147483646;
+  --z-popup-header: 500;
+  --z-popup-tabs: 400;
+  --z-popup-main: 100;
+  --z-popup-modal: 2147483647;
+
   --bg-page:      #f0f2f6;
   --bg-surface:   #ffffff;
   --bg-inset:     #f7f9fc;
@@ -79,11 +86,15 @@
 html {
   color-scheme: light dark;
   height: 100%;
+  position: relative;
+  isolation: isolate;
+  z-index: var(--z-popup-layer);
 }
 
 body {
   position: relative;
-  z-index: 9999;
+  isolation: isolate;
+  z-index: var(--z-popup-layer);
   width: 460px;
   max-height: min(640px, 100vh);
   margin: 0;
@@ -101,13 +112,15 @@ body {
 ═══════════════════════════════════════════════════ */
 .popup-container {
   position: relative;
-  z-index: 9999;
+  isolation: isolate;
+  z-index: var(--z-popup-layer);
   display: flex;
   flex-direction: column;
   max-height: min(640px, 100vh);
   min-height: 0;
   height: 100%;
   overflow: hidden;
+  transform: translateZ(0);
 }
 
 /* Área principal: precisa min-height:0 para o scroll funcionar dentro das abas (flexbox). */
@@ -117,12 +130,16 @@ body {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  position: relative;
+  z-index: var(--z-popup-main);
 }
 
 /* ═══════════════════════════════════════════════════
    HEADER
 ═══════════════════════════════════════════════════ */
 .popup-header {
+  position: relative;
+  z-index: var(--z-popup-header);
   background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
   color: #fff;
   padding: 11px 14px;
@@ -131,6 +148,7 @@ body {
   align-items: center;
   flex-shrink: 0;
   gap: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .header-left { min-width: 0; flex: 1; }
@@ -193,6 +211,8 @@ body {
    LOADING
 ═══════════════════════════════════════════════════ */
 .loading {
+  position: relative;
+  z-index: var(--z-popup-main);
   flex: 1;
   min-height: 0;
   display: flex;
@@ -219,6 +239,8 @@ body {
    ERROR
 ═══════════════════════════════════════════════════ */
 .error-state {
+  position: relative;
+  z-index: var(--z-popup-main);
   flex: 1;
   min-height: 0;
   display: flex;
@@ -247,6 +269,8 @@ body {
    TAB BAR
 ═══════════════════════════════════════════════════ */
 .tab-bar {
+  position: relative;
+  z-index: var(--z-popup-tabs);
   display: flex;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
@@ -1198,6 +1222,8 @@ body {
    FOOTER
 ═══════════════════════════════════════════════════ */
 .popup-footer {
+  position: relative;
+  z-index: 350;
   padding: 9px 12px;
   background: var(--bg-surface);
   border-top: 1px solid var(--border);
@@ -1244,7 +1270,7 @@ body {
   background: rgba(0,0,0,0.55);
   display: flex;
   align-items: flex-end;
-  z-index: 10000;
+  z-index: var(--z-popup-modal);
   backdrop-filter: blur(2px);
 }
 
