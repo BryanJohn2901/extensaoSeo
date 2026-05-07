@@ -139,7 +139,7 @@ body {
   color: white;
   font-size: 16px;
   cursor: pointer;
-  width: 30px; height: 30px;
+  min-width: 30px; width: 30px; height: 30px;
   border-radius: var(--radius-xs);
   display: flex; align-items: center; justify-content: center;
   transition: background 0.15s, border-color 0.15s;
@@ -147,29 +147,26 @@ body {
 }
 .icon-btn:hover { background: rgba(255,255,255,0.26); border-color: rgba(255,255,255,0.35); }
 
-/* Theme toggle — draws a sun (light mode) or half-moon (dark mode) */
+/* Theme toggle — pill switch */
+.theme-btn {
+  width: 42px !important;
+  border-radius: 20px !important;
+  position: relative;
+  overflow: hidden;
+}
 .theme-btn::before {
   content: '';
-  display: block;
-  width: 14px; height: 14px;
+  position: absolute;
+  width: 18px; height: 18px;
   border-radius: 50%;
   background: white;
-  transition: all 0.3s;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: left 0.25s cubic-bezier(0.4,0,0.2,1), background 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
 }
-[data-theme="light"] .theme-btn::before {
-  box-shadow:
-    0 0 0 2px #4f46e5,
-    -5px 0 0 1px white inset,
-    3px -3px 0 0 rgba(255,255,255,0);
-  border-radius: 50%;
-  background: transparent;
-  border: 2px solid white;
-}
-[data-theme="dark"] .theme-btn::before {
-  background: white;
-  border-radius: 50%;
-  box-shadow: -3px -1px 0 0 #4f46e5 inset;
-}
+[data-theme="light"] .theme-btn::before { left: 4px; }
+[data-theme="dark"]  .theme-btn::before { left: 20px; background: #e2e8f0; }
 
 /* ═══════════════════════════════════════════════════
    LOADING
@@ -668,9 +665,6 @@ body {
   background: var(--bg-inset-2);
   border-radius: 4px;
   overflow: hidden;
-  position: relative;
-  display: flex;
-  align-items: center;
   transition: background-color 0.3s;
 }
 
@@ -683,13 +677,13 @@ body {
 .bar-warn { background: var(--amber); }
 
 .img-bar-pct {
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 600;
   color: var(--text-3);
-  margin-left: 8px;
   white-space: nowrap;
-  position: absolute;
-  right: -36px;
+  min-width: 34px;
+  text-align: right;
+  flex-shrink: 0;
 }
 
 .img-missing-title {
@@ -1038,6 +1032,65 @@ body {
   color: var(--green);
   font-weight: 600;
   font-size: 13px;
+}
+
+/* ═══════════════════════════════════════════════════
+   BACKLINKS
+═══════════════════════════════════════════════════ */
+.backlinks-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  margin-bottom: 12px;
+  transition: background-color 0.3s;
+}
+
+.backlinks-icon {
+  font-size: 22px;
+  color: var(--accent);
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.backlinks-msg {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-1);
+  margin-bottom: 4px;
+}
+
+.backlinks-detail {
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
+.backlinks-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.backlinks-tool {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--bg-inset-2);
+  color: var(--text-2);
+  border: 1px solid var(--border-light);
+  transition: background-color 0.3s;
+}
+
+.tool-free {
+  background: var(--green-dim);
+  color: var(--green-text);
+  border-color: var(--green-dim);
 }
 
 /* ═══════════════════════════════════════════════════

@@ -271,7 +271,9 @@ class PopupManager {
       return;
     }
 
-    const bar = (pct, cls) => '<div class="img-bar-wrap"><div class="img-bar ' + cls + '" style="width:' + pct + '%"></div><span class="img-bar-pct">' + pct + '%</span></div>';
+    const bar = (pct, cls) =>
+      '<div class="img-bar-wrap"><div class="img-bar ' + cls + '" style="width:' + pct + '%"></div></div>' +
+      '<span class="img-bar-pct">' + pct + '%</span>';
 
     document.getElementById('imageStats').innerHTML =
       '<div class="img-stat"><span class="img-stat-lbl">Total</span><strong>' + img.total + '</strong></div>' +
