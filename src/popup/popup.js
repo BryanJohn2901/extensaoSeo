@@ -1,34 +1,36 @@
 class PopupManager {
   constructor() {
-    this.currentAnalysis = null;
+    this.data = null;
     this.init();
   }
 
   init() {
-    document.getElementById('exportBtn').addEventListener('click', () => this.exportJSON());
     document.getElementById('reloadBtn').addEventListener('click', () => this.requestAnalysis());
-    document.getElementById('retryBtn') && document.getElementById('retryBtn').addEventListener('click', () => this.requestAnalysis());
+    document.getElementById('exportBtn').addEventListener('click', () => this.exportJSON());
+    document.getElementById('retryBtn').addEventListener('click', () => this.requestAnalysis());
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
+    });
     this.requestAnalysis();
+  }
+
+  switchTab(id) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === id));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + id));
   }
 
   requestAnalysis() {
     document.getElementById('loading').style.display = 'flex';
-    document.getElementById('results').style.display = 'none';
+    document.getElementById('main').style.display = 'none';
     document.getElementById('error').style.display = 'none';
 
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs[0]) {
-        return this.showError('Aba nao encontrada');
-      }
+      if (!tabs[0]) return this.showError('Aba nao encontrada.');
 
       chrome.tabs.sendMessage(tabs[0].id, { type: 'REQUEST_ANALYSIS' }, (response) => {
         if (chrome.runtime.lastError) {
           chrome.storage.local.get('lastAnalysis', (result) => {
-            if (result.lastAnalysis) {
-              this.render(result.lastAnalysis);
-            } else {
-              this.showError('Nao foi possivel analisar esta pagina. Recarregue a pagina (F5) e tente novamente.');
-            }
+            result.lastAnalysis ? this.render(result.lastAnalysis) : this.showError('Recarregue a pagina (F5) e tente novamente.');
           });
         } else if (response && response.success && response.data) {
           this.render(response.data);
@@ -40,344 +42,419 @@ class PopupManager {
   }
 
   render(data) {
-    this.currentAnalysis = data;
+    this.data = data;
+    try { document.getElementById('urlDisplay').textContent = new URL(data.url).hostname; } catch (e) {}
 
-    try {
-      document.getElementById('urlDisplay').textContent = new URL(data.url).hostname;
-    } catch (e) {
-      document.getElementById('urlDisplay').textContent = data.url || '';
-    }
-
-    this.renderScore();
-    this.renderMetaTags();
-    this.renderChecks();
-    this.renderKeywords();
-    this.renderActionPlan();
+    this.renderSEO();
+    this.renderTags();
+    this.renderLinks();
+    this.renderContent();
+    this.renderPlan();
+    this.updateBadges();
 
     document.getElementById('loading').style.display = 'none';
-    document.getElementById('results').style.display = 'block';
+    document.getElementById('main').style.display = 'flex';
   }
 
-  // ─── SCORE ───────────────────────────────────────────────
+  // ─── SEO TAB ─────────────────────────────────────────────────
 
-  renderScore() {
-    const score = this.calculateScore();
+  renderSEO() {
+    const score = this.calcScore();
+
+    // Score card
     const el = document.getElementById('scoreValue');
     el.textContent = score.toFixed(1);
     el.className = 'score-number ' + this.scoreClass(score);
+    document.getElementById('scoreFill').style.width = (score / 10 * 100) + '%';
+    document.getElementById('scoreFill').className = 'score-fill ' + this.scoreClass(score);
+    document.getElementById('scoreMsg').textContent = this.scoreLabel(score);
 
-    document.getElementById('scoreMsg').textContent = this.scoreMessage(score);
+    // Meta tags
+    const meta = this.data.meta || {};
 
-    const fill = document.getElementById('scoreFill');
-    fill.style.width = (score / 10 * 100) + '%';
-    fill.className = 'score-fill ' + this.scoreClass(score);
-  }
+    this.setMetaField('titleContent', 'titleBadge', meta.title, meta.titleLength, meta.titleOptimal, '(ausente)', '30-60 chars');
+    this.setMetaField('descContent', 'descBadge', meta.description, meta.descriptionLength, meta.descriptionOptimal, '(ausente)', '120-160 chars');
 
-  calculateScore() {
-    const d = this.currentAnalysis;
-    let s = 3;
-    if (d.meta && d.meta.titleOptimal) s += 1;
-    if (d.meta && d.meta.descriptionOptimal) s += 1;
-    if (d.headings && d.headings.distribution && d.headings.distribution.h1 === 1) s += 1;
-    if (d.technical && d.technical.isHTTPS) s += 1;
-    if (d.technical && d.technical.mobile) s += 1;
-    const tot = (d.images && d.images.total) || 0;
-    const alt = (d.images && d.images.withAlt) || 0;
-    if (tot === 0 || (alt / tot) >= 0.8) s += 1;
-    if (d.keywords && d.keywords.wordCount >= 300) s += 1;
-    return Math.min(s, 10);
-  }
-
-  scoreClass(score) {
-    if (score >= 8) return 'green';
-    if (score >= 5) return 'amber';
-    return 'red';
-  }
-
-  scoreMessage(score) {
-    if (score >= 8) return 'Excelente — SEO bem otimizado';
-    if (score >= 6) return 'Bom — ha melhorias possiveis';
-    if (score >= 4) return 'Regular — varios pontos para otimizar';
-    return 'Critico — muitos problemas identificados';
-  }
-
-  // ─── META TAGS ───────────────────────────────────────────
-
-  renderMetaTags() {
-    const meta = this.currentAnalysis.meta || {};
-
-    // Title
-    const titleContent = document.getElementById('titleContent');
-    const titleBadge = document.getElementById('titleBadge');
-    if (meta.title) {
-      titleContent.textContent = meta.title;
-      titleBadge.textContent = meta.titleLength + ' chars';
-      titleBadge.className = 'length-badge ' + (meta.titleOptimal ? 'badge-good' : 'badge-warn');
-    } else {
-      titleContent.textContent = 'Nao encontrada';
-      titleContent.className = 'meta-value muted';
-      titleBadge.textContent = 'ausente';
-      titleBadge.className = 'length-badge badge-bad';
+    const h1List = (this.data.headings && this.data.headings.h1) || [];
+    if (h1List.length > 0) {
+      document.getElementById('h1Block').style.display = 'block';
+      document.getElementById('h1Content').textContent = h1List.map(h => h.text).join(' / ');
     }
 
-    // Description
-    const descContent = document.getElementById('descContent');
-    const descBadge = document.getElementById('descBadge');
-    if (meta.description) {
-      descContent.textContent = meta.description;
-      descBadge.textContent = meta.descriptionLength + ' chars';
-      descBadge.className = 'length-badge ' + (meta.descriptionOptimal ? 'badge-good' : 'badge-warn');
-    } else {
-      descContent.textContent = 'Nao encontrada';
-      descBadge.textContent = 'ausente';
-      descBadge.className = 'length-badge badge-bad';
-    }
-
-    // Canonical
     if (meta.canonical) {
       document.getElementById('canonicalBlock').style.display = 'block';
       document.getElementById('canonicalContent').textContent = meta.canonical;
     }
+
+    // Checks
+    this.renderChecks();
   }
 
-  // ─── VERIFICACOES ─────────────────────────────────────────
+  setMetaField(contentId, badgeId, text, length, optimal, emptyLabel, rangeLabel) {
+    const contentEl = document.getElementById(contentId);
+    const badgeEl   = document.getElementById(badgeId);
+    if (text) {
+      contentEl.textContent = text;
+      contentEl.classList.remove('absent');
+      badgeEl.textContent   = length + ' chars';
+      badgeEl.className     = 'len-badge ' + (optimal ? 'badge-ok' : 'badge-warn');
+    } else {
+      contentEl.textContent = emptyLabel;
+      contentEl.classList.add('absent');
+      badgeEl.textContent   = 'ausente';
+      badgeEl.className     = 'len-badge badge-bad';
+    }
+  }
 
   renderChecks() {
-    const d = this.currentAnalysis;
+    const d    = this.data;
     const meta = d.meta || {};
     const tech = d.technical || {};
-    const images = d.images || {};
-    const h1Count = (d.headings && d.headings.distribution && d.headings.distribution.h1) || 0;
+    const img  = d.images || {};
+    const h1   = (d.headings && d.headings.distribution && d.headings.distribution.h1) || 0;
+    const wc   = (d.keywords && d.keywords.wordCount) || 0;
 
-    // Title
-    if (!meta.title) {
-      this.setCheck('title', 'bad', 'Tag title ausente');
-    } else if (meta.titleOptimal) {
-      this.setCheck('title', 'good', meta.titleLength + ' chars — dentro do ideal (30-60)');
-    } else {
-      this.setCheck('title', 'warn', meta.titleLength + ' chars — ideal entre 30 e 60 caracteres');
-    }
+    const checks = [
+      {
+        label: 'Title Tag',
+        status: !meta.title ? 'bad' : meta.titleOptimal ? 'good' : 'warn',
+        msg: !meta.title ? 'Ausente' : meta.titleLength + ' chars — ideal: 30-60'
+      },
+      {
+        label: 'Meta Description',
+        status: !meta.description ? 'bad' : meta.descriptionOptimal ? 'good' : 'warn',
+        msg: !meta.description ? 'Ausente' : meta.descriptionLength + ' chars — ideal: 120-160'
+      },
+      {
+        label: 'H1 Heading',
+        status: h1 === 0 ? 'bad' : h1 === 1 ? 'good' : 'warn',
+        msg: h1 === 0 ? 'Nenhuma H1 encontrada' : h1 === 1 ? '1 H1 (ideal)' : h1 + ' H1s — ideal: somente 1'
+      },
+      {
+        label: 'HTTPS / SSL',
+        status: tech.isHTTPS ? 'good' : 'bad',
+        msg: tech.isHTTPS ? 'Conexao segura' : 'Pagina sem HTTPS'
+      },
+      {
+        label: 'Mobile Friendly',
+        status: tech.mobile ? 'good' : 'bad',
+        msg: tech.mobile ? 'Meta viewport configurado' : 'Meta viewport ausente'
+      },
+      {
+        label: 'Alt Text em Imagens',
+        status: img.total === 0 ? 'good' : img.missingAlt === 0 ? 'good' : img.missingAlt > img.total * 0.5 ? 'bad' : 'warn',
+        msg: img.total === 0 ? 'Sem imagens' : img.missingAlt === 0
+          ? img.total + ' imagens — todas com alt'
+          : img.missingAlt + ' de ' + img.total + ' sem alt text'
+      },
+      {
+        label: 'Volume de Conteudo',
+        status: wc >= 300 ? 'good' : wc >= 100 ? 'warn' : 'bad',
+        msg: wc + ' palavras — ' + (d.keywords && d.keywords.readingTime || 0) + ' min leitura' + (wc < 300 ? ' (recomendado: 300+)' : '')
+      },
+      {
+        label: 'Tag Canonical',
+        status: tech.hasCanonical ? 'good' : 'warn',
+        msg: tech.hasCanonical ? 'Presente' : 'Ausente — recomendada para evitar conteudo duplicado'
+      },
+      {
+        label: 'Atributo Lang',
+        status: tech.lang ? 'good' : 'warn',
+        msg: tech.lang ? 'lang="' + tech.lang + '"' : 'Ausente na tag <html>'
+      }
+    ];
 
-    // Description
-    if (!meta.description) {
-      this.setCheck('desc', 'bad', 'Meta description ausente');
-    } else if (meta.descriptionOptimal) {
-      this.setCheck('desc', 'good', meta.descriptionLength + ' chars — dentro do ideal (120-160)');
-    } else {
-      this.setCheck('desc', 'warn', meta.descriptionLength + ' chars — ideal entre 120 e 160 caracteres');
-    }
-
-    // H1
-    if (h1Count === 0) {
-      this.setCheck('h1', 'bad', 'Nenhuma tag H1 encontrada');
-    } else if (h1Count === 1) {
-      const h1Text = (d.headings && d.headings.h1 && d.headings.h1[0] && d.headings.h1[0].text) || '';
-      this.setCheck('h1', 'good', '1 H1 — "' + h1Text.substring(0, 50) + (h1Text.length > 50 ? '...' : '') + '"');
-    } else {
-      this.setCheck('h1', 'warn', h1Count + ' tags H1 encontradas — o ideal e apenas 1');
-    }
-
-    // HTTPS
-    this.setCheck('https', tech.isHTTPS ? 'good' : 'bad',
-      tech.isHTTPS ? 'Conexao segura (HTTPS)' : 'Pagina sem HTTPS — fator de ranqueamento');
-
-    // Mobile
-    this.setCheck('mobile', tech.mobile ? 'good' : 'bad',
-      tech.mobile ? 'Viewport configurado corretamente' : 'Meta viewport ausente — nao otimizado para mobile');
-
-    // Images
-    const missingAlt = images.missingAlt || 0;
-    const total = images.total || 0;
-    if (total === 0) {
-      this.setCheck('images', 'good', 'Nenhuma imagem na pagina');
-    } else if (missingAlt === 0) {
-      this.setCheck('images', 'good', total + ' imagens — todas com alt text');
-    } else {
-      this.setCheck('images', missingAlt > total * 0.5 ? 'bad' : 'warn',
-        missingAlt + ' de ' + total + ' imagens sem alt text');
-    }
-
-    // Word count
-    const wc = (d.keywords && d.keywords.wordCount) || 0;
-    const rt = (d.keywords && d.keywords.readingTime) || 0;
-    this.setCheck('content', wc >= 300 ? 'good' : 'warn',
-      wc + ' palavras — ' + rt + ' min de leitura' + (wc < 300 ? ' (recomendado: 300+)' : ''));
-
-    // Canonical
-    this.setCheck('canonical', tech.hasCanonical ? 'good' : 'warn',
-      tech.hasCanonical ? 'Tag canonical presente' : 'Tag canonical ausente — recomendada para evitar conteudo duplicado');
-
-    // Lang
-    const lang = tech.lang || '';
-    this.setCheck('lang', lang ? 'good' : 'warn',
-      lang ? 'lang="' + lang + '"' : 'Atributo lang ausente no <html>');
-  }
-
-  setCheck(id, status, message) {
-    const item = document.getElementById('check-' + id);
-    if (!item) return;
-    const icon = item.querySelector('.check-icon');
-    const msg = item.querySelector('small');
-
-    const map = { good: { symbol: '✓', cls: 'icon-good' }, warn: { symbol: '!', cls: 'icon-warn' }, bad: { symbol: '✕', cls: 'icon-bad' } };
-    const s = map[status] || map.warn;
-    icon.textContent = s.symbol;
-    icon.className = 'check-icon ' + s.cls;
-    item.className = 'check-item border-' + status;
-    msg.textContent = message;
-  }
-
-  // ─── PALAVRAS-CHAVE ───────────────────────────────────────
-
-  renderKeywords() {
-    const kw = (this.currentAnalysis.keywords && this.currentAnalysis.keywords.topKeywords) || [];
-    const container = document.getElementById('keywordsTable');
-
-    if (kw.length === 0) {
-      container.innerHTML = '<p class="muted-text">Nenhuma palavra-chave identificada.</p>';
-    } else {
-      const max = kw[0].count;
-      container.innerHTML = kw.map((item, i) =>
-        '<div class="kw-row">' +
-          '<span class="kw-rank">' + (i + 1) + '</span>' +
-          '<span class="kw-word">' + item.word + '</span>' +
-          '<div class="kw-bar-wrap"><div class="kw-bar" style="width:' + Math.round(item.count / max * 100) + '%"></div></div>' +
-          '<span class="kw-count">' + item.count + 'x</span>' +
-        '</div>'
-      ).join('');
-    }
-
-    const d = this.currentAnalysis.keywords || {};
-    document.getElementById('wordCountStat').textContent = (d.wordCount || 0) + ' palavras';
-    document.getElementById('readingTimeStat').textContent = (d.readingTime || 0) + ' min leitura';
-    document.getElementById('paragraphsStat').textContent = (d.paragraphs || 0) + ' paragrafos';
-  }
-
-  // ─── PLANO DE ACAO ────────────────────────────────────────
-
-  renderActionPlan() {
-    const actions = this.generateActionPlan();
-    const container = document.getElementById('actionPlan');
-    const allGood = document.getElementById('allGood');
-
-    if (actions.length === 0) {
-      container.style.display = 'none';
-      allGood.style.display = 'block';
-      return;
-    }
-
-    container.style.display = 'block';
-    allGood.style.display = 'none';
-
-    const priorityOrder = { critico: 0, importante: 1, recomendado: 2 };
-    actions.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
-
-    container.innerHTML = actions.map((action, i) =>
-      '<div class="action-item action-' + action.priority + '">' +
-        '<div class="action-header">' +
-          '<span class="action-num">' + (i + 1) + '</span>' +
-          '<span class="action-badge badge-' + action.priority + '">' + action.priority.toUpperCase() + '</span>' +
-          '<span class="action-impact">Impacto: ' + action.impact + '</span>' +
-        '</div>' +
-        '<p class="action-text">' + action.text + '</p>' +
+    const icons = { good: '✓', warn: '!', bad: '✕' };
+    document.getElementById('checksContainer').innerHTML = checks.map(c =>
+      '<div class="check-item border-' + c.status + '">' +
+        '<span class="check-icon icon-' + c.status + '">' + icons[c.status] + '</span>' +
+        '<div class="check-body"><strong>' + c.label + '</strong><small>' + c.msg + '</small></div>' +
       '</div>'
     ).join('');
   }
 
-  generateActionPlan() {
-    const d = this.currentAnalysis;
+  calcScore() {
+    const d = this.data;
     const meta = d.meta || {};
     const tech = d.technical || {};
-    const images = d.images || {};
-    const kw = d.keywords || {};
-    const h1Count = (d.headings && d.headings.distribution && d.headings.distribution.h1) || 0;
-    const actions = [];
-
-    // HTTPS
-    if (!tech.isHTTPS) {
-      actions.push({ priority: 'critico', impact: 'Alto', text: 'Migrar para HTTPS. SSL e fator de ranqueamento confirmado pelo Google e aumenta a confianca do usuario.' });
-    }
-
-    // Title
-    if (!meta.title) {
-      actions.push({ priority: 'critico', impact: 'Alto', text: 'Adicionar tag <title> unica com 30-60 caracteres. Inclua a palavra-chave principal logo no inicio.' });
-    } else if (meta.titleLength < 30) {
-      actions.push({ priority: 'importante', impact: 'Alto', text: 'Expandir o title (atual: ' + meta.titleLength + ' chars). Ideal entre 30-60 caracteres. Inclua a palavra-chave principal.' });
-    } else if (meta.titleLength > 60) {
-      actions.push({ priority: 'importante', impact: 'Medio', text: 'Reduzir o title (atual: ' + meta.titleLength + ' chars). Acima de 60 caracteres e truncado pelo Google nos resultados.' });
-    }
-
-    // Meta description
-    if (!meta.description) {
-      actions.push({ priority: 'critico', impact: 'Alto', text: 'Adicionar meta description com 120-160 caracteres. Inclua a palavra-chave principal e um call-to-action para aumentar o CTR.' });
-    } else if (meta.descriptionLength < 120) {
-      actions.push({ priority: 'importante', impact: 'Alto', text: 'Expandir a meta description (atual: ' + meta.descriptionLength + ' chars). Ideal entre 120-160 caracteres com call-to-action.' });
-    } else if (meta.descriptionLength > 160) {
-      actions.push({ priority: 'importante', impact: 'Medio', text: 'Reduzir a meta description (atual: ' + meta.descriptionLength + ' chars). Acima de 160 chars o Google trunca o texto nos resultados.' });
-    }
-
-    // H1
-    if (h1Count === 0) {
-      actions.push({ priority: 'critico', impact: 'Alto', text: 'Adicionar uma unica tag H1 com a palavra-chave principal. O H1 e o titulo mais importante para o Google.' });
-    } else if (h1Count > 1) {
-      actions.push({ priority: 'importante', impact: 'Medio', text: 'Manter apenas 1 tag H1 por pagina (atual: ' + h1Count + '). Use H2 e H3 para subtitulos hierarquicos.' });
-    }
-
-    // Mobile
-    if (!tech.mobile) {
-      actions.push({ priority: 'critico', impact: 'Alto', text: "Adicionar meta viewport: <meta name='viewport' content='width=device-width, initial-scale=1'>. Google usa indexacao mobile-first." });
-    }
-
-    // Images alt
-    const missingAlt = images.missingAlt || 0;
-    const totalImgs = images.total || 0;
-    if (missingAlt > 0) {
-      actions.push({
-        priority: missingAlt > totalImgs * 0.5 ? 'importante' : 'recomendado',
-        impact: 'Medio',
-        text: 'Adicionar atributo alt descritivo em ' + missingAlt + ' imagem(ns). O alt text ajuda o Google a entender o conteudo visual e melhora a acessibilidade.'
-      });
-    }
-
-    // Word count
-    if ((kw.wordCount || 0) < 300) {
-      actions.push({ priority: 'recomendado', impact: 'Medio', text: 'Aumentar o volume de conteudo (atual: ' + (kw.wordCount || 0) + ' palavras). Paginas com 300+ palavras tendem a ranquear melhor.' });
-    }
-
-    // Canonical
-    if (!tech.hasCanonical) {
-      actions.push({ priority: 'recomendado', impact: 'Medio', text: "Adicionar tag canonical: <link rel='canonical' href='URL_DA_PAGINA'>. Evita penalizacao por conteudo duplicado." });
-    }
-
-    // Lang
-    if (!tech.lang) {
-      actions.push({ priority: 'recomendado', impact: 'Baixo', text: "Adicionar atributo lang na tag <html>, por exemplo lang='pt-BR'. Ajuda mecanismos de busca a identificar o idioma." });
-    }
-
-    return actions;
+    const img  = d.images || {};
+    let s = 3;
+    if (meta.titleOptimal) s++;
+    if (meta.descriptionOptimal) s++;
+    if ((d.headings && d.headings.distribution && d.headings.distribution.h1) === 1) s++;
+    if (tech.isHTTPS) s++;
+    if (tech.mobile) s++;
+    if (img.total === 0 || (img.withAlt / img.total) >= 0.8) s++;
+    if ((d.keywords && d.keywords.wordCount) >= 300) s++;
+    return Math.min(s, 10);
   }
 
-  // ─── EXPORT ──────────────────────────────────────────────
+  scoreClass(s) { return s >= 8 ? 'green' : s >= 5 ? 'amber' : 'red'; }
+
+  scoreLabel(s) {
+    if (s >= 8) return 'Excelente — SEO bem otimizado';
+    if (s >= 6) return 'Bom — ha melhorias possiveis';
+    if (s >= 4) return 'Regular — varios pontos para otimizar';
+    return 'Critico — muitos problemas identificados';
+  }
+
+  // ─── TAGS TAB ────────────────────────────────────────────────
+
+  renderTags() {
+    const tags     = this.data.tags || [];
+    const webhooks = this.data.webhooks || [];
+
+    // Group tags by category
+    const grouped = {};
+    tags.forEach(t => {
+      if (!grouped[t.category]) grouped[t.category] = [];
+      grouped[t.category].push(t);
+    });
+
+    const CATEGORY_COLOR = {
+      'Tag Manager': '#5a67d8',
+      'Analytics':   '#0891b2',
+      'Ads':         '#7c3aed',
+      'Heatmap':     '#d97706',
+      'Chat':        '#059669',
+      'CRM':         '#db2777',
+      'Email':       '#dc2626'
+    };
+
+    if (tags.length === 0) {
+      document.getElementById('tagsList').innerHTML = '<p class="empty-msg">Nenhuma tag detectada nesta pagina.</p>';
+    } else {
+      document.getElementById('tagsList').innerHTML = Object.entries(grouped).map(([cat, items]) =>
+        '<div class="tag-group">' +
+          '<p class="tag-group-label" style="color:' + (CATEGORY_COLOR[cat] || '#555') + '">' + cat + '</p>' +
+          items.map(t =>
+            '<div class="tag-item">' +
+              '<span class="tag-dot" style="background:' + (CATEGORY_COLOR[cat] || '#555') + '"></span>' +
+              '<div class="tag-info">' +
+                '<span class="tag-name">' + t.name + '</span>' +
+                (t.id ? '<span class="tag-id">' + t.id + '</span>' : '') +
+              '</div>' +
+              '<span class="tag-status">ativo</span>' +
+            '</div>'
+          ).join('') +
+        '</div>'
+      ).join('');
+    }
+
+    if (webhooks.length === 0) {
+      document.getElementById('webhooksList').innerHTML = '<p class="empty-msg">Nenhum webhook detectado.</p>';
+    } else {
+      document.getElementById('webhooksList').innerHTML = webhooks.map(w =>
+        '<div class="webhook-item">' +
+          '<div class="webhook-name">' + w.name + '</div>' +
+          '<div class="webhook-url">' + w.url + '</div>' +
+        '</div>'
+      ).join('');
+    }
+  }
+
+  // ─── LINKS TAB ───────────────────────────────────────────────
+
+  renderLinks() {
+    const links = this.data.links || {};
+
+    document.getElementById('statInternal').textContent  = links.internal || 0;
+    document.getElementById('statExternal').textContent  = links.external || 0;
+    document.getElementById('statRedirects').textContent = (links.redirects || []).length;
+    document.getElementById('statNofollow').textContent  = links.nofollow || 0;
+
+    // Redirects
+    const redirects = links.redirects || [];
+    if (redirects.length === 0) {
+      document.getElementById('redirectsList').innerHTML = '<p class="empty-msg">Nenhum link de redirecionamento encontrado.</p>';
+    } else {
+      document.getElementById('redirectsList').innerHTML = redirects.map(r =>
+        '<div class="link-item">' +
+          '<span class="link-service">' + r.service + '</span>' +
+          '<div class="link-detail">' +
+            '<span class="link-text">' + r.text + '</span>' +
+            '<span class="link-href">' + r.href + '</span>' +
+          '</div>' +
+        '</div>'
+      ).join('');
+    }
+
+    // External domains
+    const domains = links.topExternalDomains || [];
+    if (domains.length === 0) {
+      document.getElementById('externalDomainsList').innerHTML = '<p class="empty-msg">Nenhum dominio externo encontrado.</p>';
+    } else {
+      const max = domains[0].count;
+      document.getElementById('externalDomainsList').innerHTML = domains.map(d =>
+        '<div class="domain-row">' +
+          '<span class="domain-name">' + d.domain + '</span>' +
+          '<div class="domain-bar-wrap"><div class="domain-bar" style="width:' + Math.round(d.count / max * 100) + '%"></div></div>' +
+          '<span class="domain-count">' + d.count + '</span>' +
+        '</div>'
+      ).join('');
+    }
+
+    // Forms
+    const forms = links.forms || [];
+    if (forms.length === 0) {
+      document.getElementById('formsList').innerHTML = '<p class="empty-msg">Nenhum formulario encontrado.</p>';
+    } else {
+      document.getElementById('formsList').innerHTML = forms.map(f =>
+        '<div class="form-item">' +
+          '<span class="form-method ' + (f.method === 'POST' ? 'method-post' : 'method-get') + '">' + f.method + '</span>' +
+          '<div class="form-detail">' +
+            '<span class="form-action">' + f.action + '</span>' +
+            '<span class="form-inputs">' + f.inputs + ' campo(s)</span>' +
+          '</div>' +
+        '</div>'
+      ).join('');
+    }
+  }
+
+  // ─── CONTENT TAB ─────────────────────────────────────────────
+
+  renderContent() {
+    const kw = this.data.keywords || {};
+    document.getElementById('statWords').textContent      = kw.wordCount || 0;
+    document.getElementById('statReading').textContent    = kw.readingTime || 0;
+    document.getElementById('statParagraphs').textContent = kw.paragraphs || 0;
+
+    const keywords = kw.topKeywords || [];
+    if (keywords.length === 0) {
+      document.getElementById('keywordsTable').innerHTML = '<p class="empty-msg">Nenhuma palavra-chave identificada.</p>';
+      return;
+    }
+    const max = keywords[0].count;
+    document.getElementById('keywordsTable').innerHTML = keywords.map((item, i) =>
+      '<div class="kw-row">' +
+        '<span class="kw-rank">' + (i + 1) + '</span>' +
+        '<span class="kw-word">' + item.word + '</span>' +
+        '<div class="kw-bar-wrap"><div class="kw-bar" style="width:' + Math.round(item.count / max * 100) + '%"></div></div>' +
+        '<span class="kw-count">' + item.count + 'x</span>' +
+      '</div>'
+    ).join('');
+  }
+
+  // ─── PLAN TAB ────────────────────────────────────────────────
+
+  renderPlan() {
+    const actions = this.buildActionPlan();
+    if (actions.length === 0) {
+      document.getElementById('actionPlan').innerHTML = '';
+      document.getElementById('allGood').style.display = 'block';
+      return;
+    }
+    document.getElementById('allGood').style.display = 'none';
+    const order = { critico: 0, importante: 1, recomendado: 2 };
+    actions.sort((a, b) => order[a.p] - order[b.p]);
+    document.getElementById('actionPlan').innerHTML = actions.map((a, i) =>
+      '<div class="action-item action-' + a.p + '">' +
+        '<div class="action-head">' +
+          '<span class="action-num">' + (i + 1) + '</span>' +
+          '<span class="action-badge badge-' + a.p + '">' + a.p.toUpperCase() + '</span>' +
+          '<span class="action-impact">Impacto: ' + a.impact + '</span>' +
+        '</div>' +
+        '<p class="action-text">' + a.text + '</p>' +
+      '</div>'
+    ).join('');
+  }
+
+  buildActionPlan() {
+    const d = this.data;
+    const meta = d.meta || {};
+    const tech = d.technical || {};
+    const img  = d.images || {};
+    const kw   = d.keywords || {};
+    const h1   = (d.headings && d.headings.distribution && d.headings.distribution.h1) || 0;
+    const acts = [];
+
+    if (!tech.isHTTPS)
+      acts.push({ p: 'critico', impact: 'Alto', text: 'Migrar para HTTPS. SSL e fator de ranqueamento confirmado pelo Google e aumenta a confianca do usuario.' });
+
+    if (!meta.title)
+      acts.push({ p: 'critico', impact: 'Alto', text: 'Adicionar tag <title> com 30-60 caracteres incluindo a palavra-chave principal logo no inicio.' });
+    else if (meta.titleLength < 30)
+      acts.push({ p: 'importante', impact: 'Alto', text: 'Expandir o title (atual: ' + meta.titleLength + ' chars). Ideal entre 30-60 caracteres com palavra-chave principal.' });
+    else if (meta.titleLength > 60)
+      acts.push({ p: 'importante', impact: 'Medio', text: 'Reduzir o title (atual: ' + meta.titleLength + ' chars). Acima de 60 chars o Google trunca nos resultados de busca.' });
+
+    if (!meta.description)
+      acts.push({ p: 'critico', impact: 'Alto', text: 'Adicionar meta description com 120-160 caracteres. Inclua a palavra-chave e um call-to-action para aumentar o CTR.' });
+    else if (meta.descriptionLength < 120)
+      acts.push({ p: 'importante', impact: 'Alto', text: 'Expandir a meta description (atual: ' + meta.descriptionLength + ' chars). Ideal entre 120-160 caracteres com call-to-action.' });
+    else if (meta.descriptionLength > 160)
+      acts.push({ p: 'importante', impact: 'Medio', text: 'Reduzir a meta description (atual: ' + meta.descriptionLength + ' chars). Acima de 160 chars o Google trunca o texto.' });
+
+    if (h1 === 0)
+      acts.push({ p: 'critico', impact: 'Alto', text: 'Adicionar uma tag H1 unica com a palavra-chave principal. H1 e o titulo de maior peso para o Google.' });
+    else if (h1 > 1)
+      acts.push({ p: 'importante', impact: 'Medio', text: 'Manter apenas 1 H1 por pagina (atual: ' + h1 + '). Use H2 e H3 para subtitulos hierarquicos.' });
+
+    if (!tech.mobile)
+      acts.push({ p: 'critico', impact: 'Alto', text: "Adicionar <meta name='viewport' content='width=device-width, initial-scale=1'>. Google usa indexacao mobile-first." });
+
+    const missing = img.missingAlt || 0;
+    const total   = img.total || 0;
+    if (missing > 0)
+      acts.push({ p: missing > total * 0.5 ? 'importante' : 'recomendado', impact: 'Medio', text: 'Adicionar atributo alt em ' + missing + ' imagem(ns). Alt text melhora acessibilidade e indexacao de imagens.' });
+
+    if ((kw.wordCount || 0) < 300)
+      acts.push({ p: 'recomendado', impact: 'Medio', text: 'Aumentar o conteudo da pagina (atual: ' + (kw.wordCount || 0) + ' palavras). Paginas com 300+ palavras tendem a ranquear melhor.' });
+
+    if (!tech.hasCanonical)
+      acts.push({ p: 'recomendado', impact: 'Medio', text: "Adicionar <link rel='canonical' href='URL'> para evitar penalizacao por conteudo duplicado." });
+
+    if (!tech.lang)
+      acts.push({ p: 'recomendado', impact: 'Baixo', text: "Adicionar atributo lang na tag <html> (ex: lang='pt-BR'). Ajuda buscadores a identificar o idioma da pagina." });
+
+    return acts;
+  }
+
+  // ─── BADGES ──────────────────────────────────────────────────
+
+  updateBadges() {
+    const checks = this.data && document.querySelectorAll('.check-item.border-bad, .check-item.border-warn');
+    const issues  = checks ? Array.from(checks).filter(c => c.classList.contains('border-bad')).length : 0;
+    const actions = document.getElementById('actionPlan').children.length;
+    const tagsCount = (this.data.tags || []).length;
+    const redirectsCount = ((this.data.links || {}).redirects || []).length;
+
+    this.setBadge('badge-seo',   issues,        'red');
+    this.setBadge('badge-tags',  tagsCount,     'blue');
+    this.setBadge('badge-links', redirectsCount,'orange');
+    this.setBadge('badge-plan',  actions,       'red');
+  }
+
+  setBadge(id, count, color) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (count > 0) {
+      el.textContent = count;
+      el.className = 'tab-badge badge-' + color;
+    } else {
+      el.textContent = '';
+      el.className = 'tab-badge';
+    }
+  }
+
+  // ─── EXPORT ──────────────────────────────────────────────────
 
   exportJSON() {
-    if (!this.currentAnalysis) return;
-    const score = this.calculateScore();
-    const actions = this.generateActionPlan();
-    const exportData = { ...this.currentAnalysis, score, actionPlan: actions, exportedAt: new Date().toISOString() };
-
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'seo-analysis-' + Date.now() + '.json';
-    link.click();
+    if (!this.data) return;
+    const out = { ...this.data, score: this.calcScore(), actionPlan: this.buildActionPlan(), exportedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'seo-analysis-' + Date.now() + '.json';
+    a.click();
     URL.revokeObjectURL(url);
   }
 
-  showError(message) {
+  showError(msg) {
     document.getElementById('loading').style.display = 'none';
-    document.getElementById('error').style.display = 'flex';
-    document.getElementById('errorMsg').textContent = message;
+    document.getElementById('error').style.display   = 'flex';
+    document.getElementById('errorMsg').textContent  = msg;
   }
 }
 

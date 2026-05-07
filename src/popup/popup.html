@@ -2,182 +2,228 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SEO Analyzer Pro</title>
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-    <div class="popup-container">
+<div class="popup-container">
 
-        <div class="popup-header">
-            <div class="header-left">
-                <h1>SEO Analyzer Pro</h1>
-                <small id="urlDisplay" class="header-url"></small>
-            </div>
-            <button id="reloadBtn" class="reload-btn" title="Reanalisar">&#8635;</button>
+    <!-- HEADER -->
+    <div class="popup-header">
+        <div class="header-left">
+            <span class="header-logo">SEO Analyzer Pro</span>
+            <small id="urlDisplay" class="header-url"></small>
         </div>
-
-        <div id="loading" class="loading">
-            <div class="spinner"></div>
-            <p>Analisando pagina...</p>
-        </div>
-
-        <div id="results" class="results" style="display: none;">
-
-            <!-- SCORE -->
-            <div class="score-card">
-                <div class="score-circle">
-                    <span id="scoreValue" class="score-number">--</span>
-                    <span class="score-denom">/10</span>
-                </div>
-                <div class="score-info">
-                    <div id="scoreBar" class="score-bar"><div id="scoreFill" class="score-fill"></div></div>
-                    <p id="scoreMsg" class="score-message"></p>
-                </div>
-            </div>
-
-            <!-- META TAGS -->
-            <div class="section">
-                <h3 class="section-title">Meta Tags</h3>
-
-                <div class="meta-block">
-                    <div class="meta-header">
-                        <span class="meta-label">Title Tag</span>
-                        <span id="titleBadge" class="length-badge"></span>
-                    </div>
-                    <p id="titleContent" class="meta-value"></p>
-                </div>
-
-                <div class="meta-block">
-                    <div class="meta-header">
-                        <span class="meta-label">Meta Description</span>
-                        <span id="descBadge" class="length-badge"></span>
-                    </div>
-                    <p id="descContent" class="meta-value muted"></p>
-                </div>
-
-                <div id="canonicalBlock" class="meta-block" style="display:none;">
-                    <div class="meta-header">
-                        <span class="meta-label">Canonical</span>
-                    </div>
-                    <p id="canonicalContent" class="meta-value muted small"></p>
-                </div>
-            </div>
-
-            <!-- VERIFICACOES -->
-            <div class="section">
-                <h3 class="section-title">Verificacoes</h3>
-
-                <div class="check-item" id="check-title">
-                    <span class="check-icon"></span>
-                    <div class="check-content">
-                        <strong>Title Tag</strong>
-                        <small id="titleMsg"></small>
-                    </div>
-                </div>
-
-                <div class="check-item" id="check-desc">
-                    <span class="check-icon"></span>
-                    <div class="check-content">
-                        <strong>Meta Description</strong>
-                        <small id="descMsg"></small>
-                    </div>
-                </div>
-
-                <div class="check-item" id="check-h1">
-                    <span class="check-icon"></span>
-                    <div class="check-content">
-                        <strong>H1 Heading</strong>
-                        <small id="h1Msg"></small>
-                    </div>
-                </div>
-
-                <div class="check-item" id="check-https">
-                    <span class="check-icon"></span>
-                    <div class="check-content">
-                        <strong>HTTPS / SSL</strong>
-                        <small id="httpsMsg"></small>
-                    </div>
-                </div>
-
-                <div class="check-item" id="check-mobile">
-                    <span class="check-icon"></span>
-                    <div class="check-content">
-                        <strong>Mobile Friendly</strong>
-                        <small id="mobileMsg"></small>
-                    </div>
-                </div>
-
-                <div class="check-item" id="check-images">
-                    <span class="check-icon"></span>
-                    <div class="check-content">
-                        <strong>Alt Text em Imagens</strong>
-                        <small id="imagesMsg"></small>
-                    </div>
-                </div>
-
-                <div class="check-item" id="check-content">
-                    <span class="check-icon"></span>
-                    <div class="check-content">
-                        <strong>Volume de Conteudo</strong>
-                        <small id="wordCountMsg"></small>
-                    </div>
-                </div>
-
-                <div class="check-item" id="check-canonical">
-                    <span class="check-icon"></span>
-                    <div class="check-content">
-                        <strong>Tag Canonical</strong>
-                        <small id="canonicalMsg"></small>
-                    </div>
-                </div>
-
-                <div class="check-item" id="check-lang">
-                    <span class="check-icon"></span>
-                    <div class="check-content">
-                        <strong>Atributo Lang</strong>
-                        <small id="langMsg"></small>
-                    </div>
-                </div>
-            </div>
-
-            <!-- PALAVRAS-CHAVE -->
-            <div class="section">
-                <h3 class="section-title">Palavras-chave da Pagina</h3>
-                <p class="section-subtitle">Termos mais frequentes no conteudo (stop words removidas)</p>
-                <div id="keywordsTable" class="keywords-table"></div>
-                <div class="content-stats">
-                    <span id="wordCountStat"></span>
-                    <span id="readingTimeStat"></span>
-                    <span id="paragraphsStat"></span>
-                </div>
-            </div>
-
-            <!-- PLANO DE ACAO -->
-            <div class="section">
-                <h3 class="section-title">Plano de Acao</h3>
-                <p class="section-subtitle">Acoes priorizadas para melhorar seu SEO</p>
-                <div id="actionPlan" class="action-plan"></div>
-                <div id="allGood" class="all-good" style="display:none;">
-                    <p>Tudo certo! Nenhuma acao critica identificada.</p>
-                </div>
-            </div>
-
-            <!-- ACOES -->
-            <div class="popup-actions">
-                <button id="exportBtn" class="btn btn-secondary">Exportar JSON</button>
-            </div>
-
-        </div>
-
-        <div id="error" class="error-message" style="display: none;">
-            <p>Erro ao analisar pagina</p>
-            <small id="errorMsg"></small>
-            <button id="retryBtn" class="btn btn-primary" style="margin-top:12px;">Tentar novamente</button>
-        </div>
-
+        <button id="reloadBtn" class="icon-btn" title="Reanalisar">&#8635;</button>
     </div>
 
-    <script src="../../dist/popup.js"></script>
+    <!-- LOADING -->
+    <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Analisando pagina...</p>
+    </div>
+
+    <!-- ERROR -->
+    <div id="error" class="error-state" style="display:none">
+        <p class="error-title">Nao foi possivel analisar esta pagina</p>
+        <small id="errorMsg"></small>
+        <button id="retryBtn" class="btn btn-primary" style="margin-top:12px">Tentar novamente</button>
+    </div>
+
+    <!-- MAIN -->
+    <div id="main" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+
+        <!-- TAB BAR -->
+        <div class="tab-bar">
+            <button class="tab active" data-tab="seo">
+                SEO
+                <span id="badge-seo" class="tab-badge"></span>
+            </button>
+            <button class="tab" data-tab="tags">
+                Tags
+                <span id="badge-tags" class="tab-badge"></span>
+            </button>
+            <button class="tab" data-tab="links">
+                Links
+                <span id="badge-links" class="tab-badge"></span>
+            </button>
+            <button class="tab" data-tab="content">Conteudo</button>
+            <button class="tab" data-tab="plan">
+                Plano
+                <span id="badge-plan" class="tab-badge"></span>
+            </button>
+        </div>
+
+        <!-- TAB CONTENTS -->
+        <div class="tab-contents">
+
+            <!-- ═══ ABA SEO ═══════════════════════════════════ -->
+            <div id="tab-seo" class="tab-pane active">
+
+                <div class="score-card">
+                    <div class="score-circle">
+                        <span id="scoreValue" class="score-number">--</span>
+                        <span class="score-denom">/10</span>
+                    </div>
+                    <div class="score-right">
+                        <div class="score-bar"><div id="scoreFill" class="score-fill"></div></div>
+                        <p id="scoreMsg" class="score-msg"></p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title">Meta Tags</h3>
+
+                    <div class="meta-row">
+                        <div class="meta-row-head">
+                            <span class="meta-lbl">Title</span>
+                            <span id="titleBadge" class="len-badge"></span>
+                        </div>
+                        <p id="titleContent" class="meta-text"></p>
+                    </div>
+
+                    <div class="meta-row">
+                        <div class="meta-row-head">
+                            <span class="meta-lbl">Meta Description</span>
+                            <span id="descBadge" class="len-badge"></span>
+                        </div>
+                        <p id="descContent" class="meta-text"></p>
+                    </div>
+
+                    <div id="h1Block" class="meta-row" style="display:none">
+                        <div class="meta-row-head">
+                            <span class="meta-lbl">H1</span>
+                        </div>
+                        <p id="h1Content" class="meta-text"></p>
+                    </div>
+
+                    <div id="canonicalBlock" class="meta-row" style="display:none">
+                        <div class="meta-row-head">
+                            <span class="meta-lbl">Canonical</span>
+                        </div>
+                        <p id="canonicalContent" class="meta-text small"></p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title">Verificacoes</h3>
+                    <div id="checksContainer"></div>
+                </div>
+
+            </div><!-- /tab-seo -->
+
+            <!-- ═══ ABA TAGS ══════════════════════════════════ -->
+            <div id="tab-tags" class="tab-pane">
+
+                <div class="card">
+                    <h3 class="card-title">Tags & Pixels Detectados</h3>
+                    <p class="card-sub">Scripts de rastreamento identificados na pagina</p>
+                    <div id="tagsList"></div>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title">Webhooks & Integracoes</h3>
+                    <p class="card-sub">Endpoints de automacao detectados em formularios e scripts</p>
+                    <div id="webhooksList"></div>
+                </div>
+
+            </div><!-- /tab-tags -->
+
+            <!-- ═══ ABA LINKS ═════════════════════════════════ -->
+            <div id="tab-links" class="tab-pane">
+
+                <div class="card">
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <span id="statInternal" class="stat-num">0</span>
+                            <span class="stat-lbl">Internos</span>
+                        </div>
+                        <div class="stat-box">
+                            <span id="statExternal" class="stat-num">0</span>
+                            <span class="stat-lbl">Externos</span>
+                        </div>
+                        <div class="stat-box">
+                            <span id="statRedirects" class="stat-num redirect-num">0</span>
+                            <span class="stat-lbl">Redirects</span>
+                        </div>
+                        <div class="stat-box">
+                            <span id="statNofollow" class="stat-num">0</span>
+                            <span class="stat-lbl">Nofollow</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" id="redirectsCard">
+                    <h3 class="card-title">Links de Redirecionamento</h3>
+                    <p class="card-sub">URLs que passam por servicos de encurtamento/rastreamento</p>
+                    <div id="redirectsList"></div>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title">Top Dominios Externos</h3>
+                    <div id="externalDomainsList"></div>
+                </div>
+
+                <div class="card" id="formsCard">
+                    <h3 class="card-title">Formularios</h3>
+                    <div id="formsList"></div>
+                </div>
+
+            </div><!-- /tab-links -->
+
+            <!-- ═══ ABA CONTEUDO ═══════════════════════════════ -->
+            <div id="tab-content" class="tab-pane">
+
+                <div class="card">
+                    <h3 class="card-title">Estatisticas</h3>
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <span id="statWords" class="stat-num">0</span>
+                            <span class="stat-lbl">Palavras</span>
+                        </div>
+                        <div class="stat-box">
+                            <span id="statReading" class="stat-num">0</span>
+                            <span class="stat-lbl">Min leitura</span>
+                        </div>
+                        <div class="stat-box">
+                            <span id="statParagraphs" class="stat-num">0</span>
+                            <span class="stat-lbl">Paragrafos</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title">Palavras-chave da Pagina</h3>
+                    <p class="card-sub">Termos mais frequentes — stop words PT/EN removidas</p>
+                    <div id="keywordsTable"></div>
+                </div>
+
+            </div><!-- /tab-content -->
+
+            <!-- ═══ ABA PLANO ══════════════════════════════════ -->
+            <div id="tab-plan" class="tab-pane">
+
+                <div class="card">
+                    <h3 class="card-title">Plano de Acao</h3>
+                    <p class="card-sub">Acoes priorizadas para melhorar o SEO desta pagina</p>
+                    <div id="actionPlan"></div>
+                    <div id="allGood" class="all-good" style="display:none">
+                        Nenhuma acao critica identificada. Pagina bem otimizada!
+                    </div>
+                </div>
+
+            </div><!-- /tab-plan -->
+
+        </div><!-- /tab-contents -->
+
+        <!-- FOOTER -->
+        <div class="popup-footer">
+            <button id="exportBtn" class="btn btn-secondary">Exportar JSON</button>
+        </div>
+
+    </div><!-- /main -->
+
+</div>
+<script src="../../dist/popup.js"></script>
 </body>
 </html>
