@@ -106,10 +106,16 @@ class PopupManager {
   mergeTags(domTags, jsTags) {
     const merged = [];
     const seen = new Set();
+    const js = Array.isArray(jsTags) ? jsTags : [];
+    const dom = Array.isArray(domTags) ? domTags : [];
     // JS globals take priority — they're post-load, reflect reality
-    jsTags.forEach(t => { if (!seen.has(t.name)) { seen.add(t.name); merged.push({ ...t }); } });
+    js.forEach(t => {
+      if (!t || !t.name) return;
+      if (!seen.has(t.name)) { seen.add(t.name); merged.push({ ...t }); }
+    });
     // DOM fallback for tags not yet initialized as globals
-    domTags.forEach(t => {
+    dom.forEach(t => {
+      if (!t || !t.name) return;
       if (!seen.has(t.name)) { seen.add(t.name); merged.push({ ...t }); }
       else if (t.id) {
         const ex = merged.find(m => m.name === t.name);
@@ -623,15 +629,18 @@ class PopupManager {
       ).join('');
     }
 
-    if (webhooks.length === 0) {
-      document.getElementById('webhooksList').innerHTML = '<p class="empty-msg">Nenhum webhook detectado.</p>';
-    } else {
-      document.getElementById('webhooksList').innerHTML = webhooks.map(w =>
-        '<div class="webhook-item">' +
-          '<div class="webhook-name">' + w.name + '</div>' +
-          '<div class="webhook-url">' + w.url + '</div>' +
-        '</div>'
-      ).join('');
+    const whEl = document.getElementById('webhooksList');
+    if (whEl) {
+      if (webhooks.length === 0) {
+        whEl.innerHTML = '<p class="empty-msg">Nenhum webhook detectado.</p>';
+      } else {
+        whEl.innerHTML = webhooks.map(w =>
+          '<div class="webhook-item">' +
+            '<div class="webhook-name">' + w.name + '</div>' +
+            '<div class="webhook-url">' + w.url + '</div>' +
+          '</div>'
+        ).join('');
+      }
     }
   }
 

@@ -361,6 +361,7 @@ const SEOAnalyzer = {
         performance:    this.analyzePerformance(),
         contentQuality: this.analyzeContentQuality(),
         tags:           this.analyzeTags(),
+        webhooks:       this.detectWebhooks(),
         technical: {
           mobile: !!document.querySelector('meta[name="viewport"]'),
           isHTTPS: window.location.protocol === 'https:',
