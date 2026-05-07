@@ -348,6 +348,15 @@ const SEOAnalyzer = {
 
   // ── TECH STACK (heuristic from DOM, scripts, meta) ───────────
   analyzeTechnologies() {
+    try {
+      return this._analyzeTechnologiesInner();
+    } catch (err) {
+      console.error('SEO Analyzer analyzeTechnologies:', err);
+      return [];
+    }
+  },
+
+  _analyzeTechnologiesInner() {
     const items = [];
     const seen = new Set();
     const dedupeKey = (name) => {
@@ -475,7 +484,7 @@ const SEOAnalyzer = {
       const ca = catOrder[a.category] !== undefined ? catOrder[a.category] : 99;
       const cb = catOrder[b.category] !== undefined ? catOrder[b.category] : 99;
       if (ca !== cb) return ca - cb;
-      return a.name.localeCompare(b.name);
+      return String(a.name || '').localeCompare(String(b.name || ''));
     });
 
     return items;

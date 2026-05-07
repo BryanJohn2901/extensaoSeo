@@ -120,7 +120,6 @@ body {
   min-height: 0;
   height: 100%;
   overflow: hidden;
-  transform: translateZ(0);
 }
 
 /* Área principal: precisa min-height:0 para o scroll funcionar dentro das abas (flexbox). */

@@ -39,6 +39,13 @@ class PopupManager {
     localStorage.setItem('seo-theme', next);
   }
 
+  /** Evita crash quando meta/OG vem como numero ou outro tipo sem .substring */
+  safeSlice(val, max) {
+    if (val == null || val === undefined) return '';
+    const s = String(val);
+    return max != null ? s.slice(0, max) : s;
+  }
+
   async requestAnalysis() {
     document.getElementById('loading').style.display = 'flex';
     document.getElementById('main').style.display = 'none';
@@ -129,13 +136,19 @@ class PopupManager {
     this.data = data;
     try { document.getElementById('urlDisplay').textContent = new URL(data.url).hostname; } catch (e) {}
 
-    this.renderSEO();
-    this.renderTags();
-    this.renderLinks();
-    this.renderTechnologies();
-    this.renderContent();
-    this.renderPlan();
-    this.updateBadges();
+    try {
+      this.renderSEO();
+      this.renderTags();
+      this.renderLinks();
+      this.renderTechnologies();
+      this.renderContent();
+      this.renderPlan();
+      this.updateBadges();
+    } catch (e) {
+      console.error('[SEO Analyzer popup] render:', e);
+      this.showError('Erro ao exibir a analise: ' + (e && e.message ? e.message : 'dados invalidos') + '. Recarregue a pagina e tente de novo.');
+      return;
+    }
 
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main').style.display = 'flex';
@@ -234,7 +247,7 @@ class PopupManager {
           '<span class="og-label">' + f.label + '</span>' +
           '<span class="og-status ' + (f.value ? 'og-ok' : 'og-miss') + '">' + (f.value ? 'presente' : 'ausente') + '</span>' +
         '</div>' +
-        '<p class="og-value ' + (f.value ? '' : 'absent') + '">' + (f.value ? f.value.substring(0, 80) : f.ideal) + '</p>' +
+        '<p class="og-value ' + (f.value ? '' : 'absent') + '">' + (f.value ? this.safeSlice(f.value, 80) : f.ideal) + '</p>' +
       '</div>'
     ).join('');
 
@@ -244,8 +257,8 @@ class PopupManager {
       twBadge.textContent = tw.card || 'presente';
       twBadge.className = 'len-badge badge-ok';
       twContent.innerHTML =
-        (tw.title       ? '<p class="og-value">' + tw.title.substring(0, 70) + '</p>' : '') +
-        (tw.description ? '<p class="og-value small" style="color:#777">' + tw.description.substring(0, 100) + '</p>' : '');
+        (tw.title       ? '<p class="og-value">' + this.safeSlice(tw.title, 70) + '</p>' : '') +
+        (tw.description ? '<p class="og-value small" style="color:#777">' + this.safeSlice(tw.description, 100) + '</p>' : '');
     } else {
       twBadge.textContent = 'ausente';
       twBadge.className = 'len-badge badge-warn';
@@ -362,7 +375,7 @@ class PopupManager {
     } else {
       document.getElementById('schemaInfo').innerHTML =
         '<p style="font-size:12px;color:#555;margin-bottom:8px">' + count + ' bloco(s) JSON-LD encontrado(s)</p>' +
-        types.map(t => '<span class="schema-badge">' + t + '</span>').join(' ');
+        types.map(t => '<span class="schema-badge">' + this.escapeHtml(String(t)) + '</span>').join(' ');
     }
   }
 
@@ -372,7 +385,8 @@ class PopupManager {
     if (text) {
       contentEl.textContent = text;
       contentEl.classList.remove('absent');
-      badgeEl.textContent   = length + ' chars';
+      const len = length != null && length !== '' ? length : String(text).length;
+      badgeEl.textContent   = len + ' chars';
       badgeEl.className     = 'len-badge ' + (optimal ? 'badge-ok' : 'badge-warn');
     } else {
       contentEl.textContent = emptyLabel;
@@ -406,7 +420,7 @@ class PopupManager {
 
       { group: 'Meta', label: 'Tag Canonical',
         status: meta.hasCanonical ? 'good' : 'warn',
-        msg: meta.hasCanonical ? meta.canonical.substring(0, 60) : 'Ausente — risco de conteudo duplicado' },
+        msg: meta.hasCanonical ? this.safeSlice(meta.canonical, 60) : 'Ausente — risco de conteudo duplicado' },
 
       { group: 'Meta', label: 'Robots Meta',
         status: meta.isNoindex ? 'bad' : 'good',
@@ -431,7 +445,7 @@ class PopupManager {
 
       { group: 'Social', label: 'OG Image',
         status: og.image ? 'good' : 'warn',
-        msg: og.image ? og.image.substring(0, 60) : 'og:image ausente — imagem de compartilhamento nao definida' },
+        msg: og.image ? this.safeSlice(og.image, 60) : 'og:image ausente — imagem de compartilhamento nao definida' },
 
       { group: 'Social', label: 'Twitter Card',
         status: (meta.tw && meta.tw.present) ? 'good' : 'warn',
@@ -441,7 +455,7 @@ class PopupManager {
       { group: 'Headings', label: 'H1',
         status: h1 === 0 ? 'bad' : h1 === 1 ? 'good' : 'warn',
         msg: h1 === 0 ? 'Nenhum H1 encontrado' : h1 === 1
-          ? '"' + ((h.h1Texts && h.h1Texts[0]) || '').substring(0, 50) + '"'
+          ? '"' + this.safeSlice((h.h1Texts && h.h1Texts[0]) || '', 50) + '"'
           : h1 + ' H1s — deve ter exatamente 1' },
 
       { group: 'Headings', label: 'H2s presentes',
@@ -996,7 +1010,7 @@ class PopupManager {
 ${line('URL', d.url || '(nao identificada)')}
 ${line('Score SEO atual', score + '/10')}
 ${line('Title', meta.title ? `"${meta.title}" (${meta.titleLength} chars)` : 'AUSENTE')}
-${line('Meta Description', meta.description ? `"${meta.description.substring(0, 100)}..." (${meta.descriptionLength} chars)` : 'AUSENTE')}
+${line('Meta Description', meta.description ? '"' + this.safeSlice(meta.description, 100) + '..." (' + (meta.descriptionLength != null ? meta.descriptionLength : this.safeSlice(meta.description).length) + ' chars)' : 'AUSENTE')}
 ${line('Canonical', meta.canonical || 'AUSENTE')}
 ${line('Robots', meta.robots || 'nao definido')}
 ${line('H1', h1 === 0 ? 'AUSENTE' : h1 === 1 ? headingH1 : h1 + ' H1s: ' + (h.h1Texts || []).join(' | '))}
