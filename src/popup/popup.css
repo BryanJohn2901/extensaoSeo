@@ -82,6 +82,8 @@ html {
 }
 
 body {
+  position: relative;
+  z-index: 9999;
   width: 460px;
   max-height: min(640px, 100vh);
   margin: 0;
@@ -98,6 +100,8 @@ body {
    CONTAINER
 ═══════════════════════════════════════════════════ */
 .popup-container {
+  position: relative;
+  z-index: 9999;
   display: flex;
   flex-direction: column;
   max-height: min(640px, 100vh);
@@ -247,14 +251,25 @@ body {
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
-  padding: 0 6px;
+  padding: 0 4px;
   gap: 2px;
   transition: background-color 0.3s, border-color 0.3s;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
 
+.tab-bar::-webkit-scrollbar { height: 4px; }
+.tab-bar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
 .tab {
-  flex: 1;
-  padding: 9px 4px 8px;
+  flex: 1 0 auto;
+  min-width: 52px;
+  max-width: 100%;
+  padding: 9px 6px 8px;
   border: none;
   background: transparent;
   font-size: 11px;
@@ -889,6 +904,50 @@ body {
 .webhook-url  { font-size: 10.5px; color: var(--text-3); font-family: 'SF Mono', monospace; word-break: break-all; }
 
 /* ═══════════════════════════════════════════════════
+   TECH STACK TAB
+═══════════════════════════════════════════════════ */
+.tech-group { margin-bottom: 14px; }
+.tech-group:last-child { margin-bottom: 0; }
+
+.tech-group-label {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.65px;
+  margin-bottom: 7px;
+  padding-left: 2px;
+}
+
+.tech-item {
+  padding: 10px 12px;
+  background: var(--bg-inset);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
+  border-left: 3px solid var(--accent);
+  margin-bottom: 5px;
+  transition: background-color 0.3s, border-color 0.3s;
+}
+
+.tech-item:last-child { margin-bottom: 0; }
+
+.tech-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-1);
+  display: block;
+  line-height: 1.35;
+}
+
+.tech-evidence {
+  font-size: 10px;
+  color: var(--text-3);
+  margin-top: 4px;
+  display: block;
+  line-height: 1.35;
+}
+
+/* ═══════════════════════════════════════════════════
    LINKS / STATS
 ═══════════════════════════════════════════════════ */
 .stats-grid {
@@ -1185,7 +1244,7 @@ body {
   background: rgba(0,0,0,0.55);
   display: flex;
   align-items: flex-end;
-  z-index: 1000;
+  z-index: 10000;
   backdrop-filter: blur(2px);
 }
 
