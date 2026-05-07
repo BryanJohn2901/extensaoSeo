@@ -103,8 +103,6 @@ class PopupManager {
 
   renderSEO() {
     const score = this.calcScore();
-
-    // Score card
     const el = document.getElementById('scoreValue');
     el.textContent = score.toFixed(1);
     el.className = 'score-number ' + this.scoreClass(score);
@@ -112,25 +110,205 @@ class PopupManager {
     document.getElementById('scoreFill').className = 'score-fill ' + this.scoreClass(score);
     document.getElementById('scoreMsg').textContent = this.scoreLabel(score);
 
-    // Meta tags
+    this.renderMetaTags();
+    this.renderOG();
+    this.renderHeadings();
+    this.renderImagesSection();
+    this.renderURLSection();
+    this.renderPerfSection();
+    this.renderSchema();
+    this.renderChecks();
+  }
+
+  // ── Meta Tags card ──────────────────────────────────────────
+
+  renderMetaTags() {
     const meta = this.data.meta || {};
 
-    this.setMetaField('titleContent', 'titleBadge', meta.title, meta.titleLength, meta.titleOptimal, '(ausente)', '30-60 chars');
-    this.setMetaField('descContent', 'descBadge', meta.description, meta.descriptionLength, meta.descriptionOptimal, '(ausente)', '120-160 chars');
+    this.setMetaField('titleContent', 'titleBadge', meta.title, meta.titleLength, meta.titleOptimal, '(ausente)');
+    this.setMetaField('descContent',  'descBadge',  meta.description, meta.descriptionLength, meta.descriptionOptimal, '(ausente)');
 
-    const h1List = (this.data.headings && this.data.headings.h1) || [];
-    if (h1List.length > 0) {
-      document.getElementById('h1Block').style.display = 'block';
-      document.getElementById('h1Content').textContent = h1List.map(h => h.text).join(' / ');
-    }
-
+    // Canonical
+    const canonEl = document.getElementById('canonicalContent');
+    const canonBadge = document.getElementById('canonicalBadge');
     if (meta.canonical) {
-      document.getElementById('canonicalBlock').style.display = 'block';
-      document.getElementById('canonicalContent').textContent = meta.canonical;
+      canonEl.textContent = meta.canonical;
+      canonEl.classList.remove('absent');
+      canonBadge.textContent = 'presente';
+      canonBadge.className = 'len-badge badge-ok';
+    } else {
+      canonEl.textContent = '(ausente)';
+      canonEl.classList.add('absent');
+      canonBadge.textContent = 'ausente';
+      canonBadge.className = 'len-badge badge-warn';
     }
 
-    // Checks
-    this.renderChecks();
+    // Robots
+    const robotsEl = document.getElementById('robotsContent');
+    const robots = meta.robots || 'nao definido';
+    robotsEl.textContent = robots;
+    if (meta.isNoindex) { robotsEl.textContent += ' — NOINDEX detectado!'; robotsEl.style.color = '#dc2626'; }
+
+    // Mini badges
+    const mini = (id, label, ok) => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '<span class="mini-badge ' + (ok ? 'mini-ok' : 'mini-warn') + '">' + label + '</span>';
+    };
+    mini('charsetMini',   'Charset: ' + (meta.hasCharset ? 'sim' : 'nao'),  meta.hasCharset);
+    mini('faviconMini',   'Favicon: ' + (meta.hasFavicon ? 'sim' : 'nao'),  meta.hasFavicon);
+    mini('ampMini',       'AMP: '     + (meta.hasAMP    ? 'sim' : 'nao'),   meta.hasAMP);
+    const hrefl = meta.hreflangTags && meta.hreflangTags.length;
+    mini('hreflangMini',  'Hreflang: '+ (hrefl ? hrefl + ' idiomas' : 'nao'), hrefl > 0);
+  }
+
+  // ── Open Graph & Twitter Card card ──────────────────────────
+
+  renderOG() {
+    const meta = this.data.meta || {};
+    const og   = meta.og || {};
+    const tw   = meta.tw || {};
+
+    const ogFields = [
+      { label: 'og:title',       value: og.title,       ideal: 'Titulo da pagina' },
+      { label: 'og:description', value: og.description, ideal: 'Descricao para redes sociais' },
+      { label: 'og:image',       value: og.image,       ideal: 'URL da imagem de compartilhamento' },
+      { label: 'og:url',         value: og.url,         ideal: 'URL canonica da pagina' },
+    ];
+
+    document.getElementById('ogGrid').innerHTML = ogFields.map(f =>
+      '<div class="og-field">' +
+        '<div class="og-field-head">' +
+          '<span class="og-label">' + f.label + '</span>' +
+          '<span class="og-status ' + (f.value ? 'og-ok' : 'og-miss') + '">' + (f.value ? 'presente' : 'ausente') + '</span>' +
+        '</div>' +
+        '<p class="og-value ' + (f.value ? '' : 'absent') + '">' + (f.value ? f.value.substring(0, 80) : f.ideal) + '</p>' +
+      '</div>'
+    ).join('');
+
+    const twBadge = document.getElementById('twBadge');
+    const twContent = document.getElementById('twContent');
+    if (tw.present || tw.card) {
+      twBadge.textContent = tw.card || 'presente';
+      twBadge.className = 'len-badge badge-ok';
+      twContent.innerHTML =
+        (tw.title       ? '<p class="og-value">' + tw.title.substring(0, 70) + '</p>' : '') +
+        (tw.description ? '<p class="og-value small" style="color:#777">' + tw.description.substring(0, 100) + '</p>' : '');
+    } else {
+      twBadge.textContent = 'ausente';
+      twBadge.className = 'len-badge badge-warn';
+      twContent.innerHTML = '<p class="og-value absent">Twitter Card nao configurado</p>';
+    }
+  }
+
+  // ── Headings card ────────────────────────────────────────────
+
+  renderHeadings() {
+    const h = this.data.headings || {};
+    const dist = h.distribution || {};
+
+    // Distribution bar
+    const LEVELS = ['h1','h2','h3','h4','h5','h6'];
+    document.getElementById('headingDist').innerHTML =
+      '<div class="h-dist-row">' +
+      LEVELS.map(lv => {
+        const n = dist[lv] || 0;
+        const ok = lv === 'h1' ? n === 1 : n >= 0;
+        const cls = lv === 'h1' && n !== 1 ? 'h-count bad' : n > 0 ? 'h-count ok' : 'h-count zero';
+        return '<div class="h-dist-cell"><span class="h-tag">' + lv.toUpperCase() + '</span><span class="' + cls + '">' + n + '</span></div>';
+      }).join('') +
+      '</div>' +
+      ((h.hierarchyIssues && h.hierarchyIssues.length)
+        ? '<p class="h-issue">' + h.hierarchyIssues.join(' · ') + '</p>'
+        : '<p class="h-ok">Hierarquia de headings correta</p>');
+
+    // Tree — first 15
+    const tree = (h.domOrder || []).slice(0, 15);
+    document.getElementById('headingTree').innerHTML = tree.map(item =>
+      '<div class="h-tree-row" style="padding-left:' + ((item.level - 1) * 12) + 'px">' +
+        '<span class="h-tree-tag h-tag-' + item.level + '">H' + item.level + '</span>' +
+        '<span class="h-tree-text">' + item.text + '</span>' +
+      '</div>'
+    ).join('') || '<p class="absent" style="font-size:12px;padding:6px 0">Nenhum heading encontrado</p>';
+  }
+
+  // ── Images card ──────────────────────────────────────────────
+
+  renderImagesSection() {
+    const img = this.data.images || {};
+    if (!img.total) {
+      document.getElementById('imageStats').innerHTML = '<p class="empty-msg">Nenhuma imagem encontrada.</p>';
+      return;
+    }
+
+    const bar = (pct, cls) => '<div class="img-bar-wrap"><div class="img-bar ' + cls + '" style="width:' + pct + '%"></div><span class="img-bar-pct">' + pct + '%</span></div>';
+
+    document.getElementById('imageStats').innerHTML =
+      '<div class="img-stat"><span class="img-stat-lbl">Total</span><strong>' + img.total + '</strong></div>' +
+      '<div class="img-stat"><span class="img-stat-lbl">Alt text</span>' + bar(img.altCoverage || 0, img.altCoverage === 100 ? 'bar-ok' : 'bar-warn') + '</div>' +
+      '<div class="img-stat"><span class="img-stat-lbl">Lazy load</span>' + bar(img.lazyCoverage || 0, img.lazyCoverage >= 80 ? 'bar-ok' : 'bar-warn') + '</div>' +
+      '<div class="img-stat"><span class="img-stat-lbl">WebP</span>'      + bar(img.webpCoverage || 0, img.webpCoverage >= 50 ? 'bar-ok' : 'bar-warn') + '</div>';
+
+    const missing = img.missingAltList || [];
+    if (missing.length > 0) {
+      document.getElementById('imageMissingAlt').innerHTML =
+        '<p class="img-missing-title">Imagens sem alt text:</p>' +
+        missing.map(s => '<div class="img-missing-item">' + s + '</div>').join('');
+    }
+  }
+
+  // ── URL card ─────────────────────────────────────────────────
+
+  renderURLSection() {
+    const u = this.data.url_analysis || {};
+    const row = (label, value, status) =>
+      '<div class="url-row">' +
+        '<span class="url-lbl">' + label + '</span>' +
+        '<span class="url-val ' + (status === 'ok' ? 'val-ok' : status === 'bad' ? 'val-bad' : 'val-warn') + '">' + value + '</span>' +
+      '</div>';
+
+    document.getElementById('urlAnalysis').innerHTML =
+      '<p class="meta-text small" style="margin-bottom:8px;word-break:break-all">' + (u.full || '') + '</p>' +
+      row('Profundidade', u.depth + ' nivel(s)', u.depth <= 4 ? 'ok' : 'warn') +
+      row('Comprimento', u.totalLength + ' chars', u.totalLength <= 100 ? 'ok' : 'warn') +
+      row('Parametros', u.hasParams ? (u.params || '') : 'nenhum', u.hasParams ? 'warn' : 'ok') +
+      row('Hifens na URL', u.hasHyphens ? 'sim (bom)' : 'nao', u.hasHyphens ? 'ok' : 'warn') +
+      row('Underscores', u.hasUnderscores ? 'sim (evitar)' : 'nao', u.hasUnderscores ? 'warn' : 'ok') +
+      row('Letras maiusculas', u.hasUpperCase ? 'sim (evitar)' : 'nao', u.hasUpperCase ? 'warn' : 'ok');
+  }
+
+  // ── Performance card ─────────────────────────────────────────
+
+  renderPerfSection() {
+    const p = this.data.performance || {};
+    const row = (label, value, status) =>
+      '<div class="url-row"><span class="url-lbl">' + label + '</span><span class="url-val ' +
+      (status === 'ok' ? 'val-ok' : status === 'bad' ? 'val-bad' : 'val-warn') + '">' + value + '</span></div>';
+
+    const hints = [p.hasPreconnect && 'preconnect', p.hasPreload && 'preload', p.hasDNSPrefetch && 'dns-prefetch'].filter(Boolean);
+
+    document.getElementById('perfStats').innerHTML =
+      row('Scripts externos',    p.scripts || 0,       'ok') +
+      row('Scripts bloqueantes', p.scriptsBlocking || 0, (p.scriptsBlocking || 0) === 0 ? 'ok' : (p.scriptsBlocking || 0) <= 2 ? 'warn' : 'bad') +
+      row('Scripts inline',      p.scriptsInline || 0, (p.scriptsInline || 0) <= 3 ? 'ok' : 'warn') +
+      row('CSS externos',        p.cssExternal || 0,   'ok') +
+      row('Iframes',             p.iframes || 0,        (p.iframes || 0) <= 2 ? 'ok' : 'warn') +
+      row('Resource hints',      hints.length ? hints.join(', ') : 'nenhum', hints.length >= 2 ? 'ok' : 'warn');
+  }
+
+  // ── Schema card ──────────────────────────────────────────────
+
+  renderSchema() {
+    const meta = this.data.meta || {};
+    const types = meta.schemaTypes || [];
+    const count = meta.schemaCount || 0;
+
+    if (count === 0) {
+      document.getElementById('schemaInfo').innerHTML = '<p class="empty-msg">Nenhum dado estruturado (JSON-LD) encontrado.</p>';
+    } else {
+      document.getElementById('schemaInfo').innerHTML =
+        '<p style="font-size:12px;color:#555;margin-bottom:8px">' + count + ' bloco(s) JSON-LD encontrado(s)</p>' +
+        types.map(t => '<span class="schema-badge">' + t + '</span>').join(' ');
+    }
   }
 
   setMetaField(contentId, badgeId, text, length, optimal, emptyLabel, rangeLabel) {
@@ -152,59 +330,122 @@ class PopupManager {
   renderChecks() {
     const d    = this.data;
     const meta = d.meta || {};
-    const tech = d.technical || {};
     const img  = d.images || {};
-    const h1   = (d.headings && d.headings.distribution && d.headings.distribution.h1) || 0;
+    const h    = d.headings || {};
+    const h1   = (h.distribution && h.distribution.h1) || 0;
     const wc   = (d.keywords && d.keywords.wordCount) || 0;
+    const url  = d.url_analysis || {};
+    const perf = d.performance || {};
+    const og   = meta.og || {};
+    const cq   = d.contentQuality || {};
 
     const checks = [
-      {
-        label: 'Title Tag',
+      // ── Meta ──────────────────────────────────────────────
+      { group: 'Meta', label: 'Title Tag',
         status: !meta.title ? 'bad' : meta.titleOptimal ? 'good' : 'warn',
-        msg: !meta.title ? 'Ausente' : meta.titleLength + ' chars — ideal: 30-60'
-      },
-      {
-        label: 'Meta Description',
+        msg: !meta.title ? 'Ausente' : meta.titleLength + ' chars (ideal 30-60)' },
+
+      { group: 'Meta', label: 'Meta Description',
         status: !meta.description ? 'bad' : meta.descriptionOptimal ? 'good' : 'warn',
-        msg: !meta.description ? 'Ausente' : meta.descriptionLength + ' chars — ideal: 120-160'
-      },
-      {
-        label: 'H1 Heading',
+        msg: !meta.description ? 'Ausente' : meta.descriptionLength + ' chars (ideal 120-160)' + (meta.descriptionHasCTA ? ' — tem CTA' : ' — adicionar call-to-action') },
+
+      { group: 'Meta', label: 'Tag Canonical',
+        status: meta.hasCanonical ? 'good' : 'warn',
+        msg: meta.hasCanonical ? meta.canonical.substring(0, 60) : 'Ausente — risco de conteudo duplicado' },
+
+      { group: 'Meta', label: 'Robots Meta',
+        status: meta.isNoindex ? 'bad' : 'good',
+        msg: meta.isNoindex ? 'NOINDEX — pagina nao sera indexada!' : (meta.robots || 'nao definido (padrao: index, follow)') },
+
+      { group: 'Meta', label: 'Atributo Lang',
+        status: meta.lang ? 'good' : 'warn',
+        msg: meta.lang ? 'lang="' + meta.lang + '"' : 'Ausente — adicionar lang na tag <html>' },
+
+      { group: 'Meta', label: 'Charset',
+        status: meta.hasCharset ? 'good' : 'warn',
+        msg: meta.hasCharset ? 'Declarado' : 'Meta charset ausente' },
+
+      { group: 'Meta', label: 'Favicon',
+        status: meta.hasFavicon ? 'good' : 'warn',
+        msg: meta.hasFavicon ? 'Presente' : 'Favicon nao encontrado' },
+
+      // ── Social ────────────────────────────────────────────
+      { group: 'Social', label: 'Open Graph',
+        status: (meta.og && meta.og.score) >= 4 ? 'good' : (meta.og && meta.og.score) >= 2 ? 'warn' : 'bad',
+        msg: (meta.og && meta.og.score) + '/4 tags configuradas (title, description, image, url)' },
+
+      { group: 'Social', label: 'OG Image',
+        status: og.image ? 'good' : 'warn',
+        msg: og.image ? og.image.substring(0, 60) : 'og:image ausente — imagem de compartilhamento nao definida' },
+
+      { group: 'Social', label: 'Twitter Card',
+        status: (meta.tw && meta.tw.present) ? 'good' : 'warn',
+        msg: (meta.tw && meta.tw.card) ? 'card="' + meta.tw.card + '"' : 'Twitter Card nao configurado' },
+
+      // ── Headings ──────────────────────────────────────────
+      { group: 'Headings', label: 'H1',
         status: h1 === 0 ? 'bad' : h1 === 1 ? 'good' : 'warn',
-        msg: h1 === 0 ? 'Nenhuma H1 encontrada' : h1 === 1 ? '1 H1 (ideal)' : h1 + ' H1s — ideal: somente 1'
-      },
-      {
-        label: 'HTTPS / SSL',
-        status: tech.isHTTPS ? 'good' : 'bad',
-        msg: tech.isHTTPS ? 'Conexao segura' : 'Pagina sem HTTPS'
-      },
-      {
-        label: 'Mobile Friendly',
-        status: tech.mobile ? 'good' : 'bad',
-        msg: tech.mobile ? 'Meta viewport configurado' : 'Meta viewport ausente'
-      },
-      {
-        label: 'Alt Text em Imagens',
-        status: img.total === 0 ? 'good' : img.missingAlt === 0 ? 'good' : img.missingAlt > img.total * 0.5 ? 'bad' : 'warn',
-        msg: img.total === 0 ? 'Sem imagens' : img.missingAlt === 0
-          ? img.total + ' imagens — todas com alt'
-          : img.missingAlt + ' de ' + img.total + ' sem alt text'
-      },
-      {
-        label: 'Volume de Conteudo',
+        msg: h1 === 0 ? 'Nenhum H1 encontrado' : h1 === 1
+          ? '"' + ((h.h1Texts && h.h1Texts[0]) || '').substring(0, 50) + '"'
+          : h1 + ' H1s — deve ter exatamente 1' },
+
+      { group: 'Headings', label: 'H2s presentes',
+        status: h.hasH2 ? 'good' : 'warn',
+        msg: h.hasH2 ? (h.distribution && h.distribution.h2) + ' H2(s) encontrados' : 'Nenhum H2 — estrutura de topicos ausente' },
+
+      { group: 'Headings', label: 'Hierarquia de Headings',
+        status: (h.hierarchyIssues && h.hierarchyIssues.length) ? 'warn' : 'good',
+        msg: (h.hierarchyIssues && h.hierarchyIssues.length) ? h.hierarchyIssues.join(', ') : 'Hierarquia correta' },
+
+      // ── Imagens ────────────────────────────────────────────
+      { group: 'Imagens', label: 'Alt Text',
+        status: img.altCoverage === 100 ? 'good' : img.altCoverage >= 80 ? 'warn' : 'bad',
+        msg: img.total === 0 ? 'Sem imagens' : img.altCoverage + '% das imagens com alt (' + img.withAlt + '/' + img.total + ')' },
+
+      { group: 'Imagens', label: 'Lazy Loading',
+        status: img.total === 0 ? 'good' : img.lazyCoverage >= 80 ? 'good' : img.lazyCoverage > 0 ? 'warn' : 'warn',
+        msg: img.total === 0 ? 'Sem imagens' : img.lazyCoverage + '% das imagens com loading="lazy"' },
+
+      { group: 'Imagens', label: 'Formato WebP',
+        status: img.total === 0 ? 'good' : img.webpCoverage >= 50 ? 'good' : 'warn',
+        msg: img.total === 0 ? 'Sem imagens' : img.webpCoverage + '% das imagens em WebP' },
+
+      // ── Tecnico ────────────────────────────────────────────
+      { group: 'Tecnico', label: 'HTTPS / SSL',
+        status: url.isHTTPS ? 'good' : 'bad',
+        msg: url.isHTTPS ? 'Conexao segura (HTTPS)' : 'Pagina sem HTTPS — fator de ranqueamento' },
+
+      { group: 'Tecnico', label: 'Mobile Friendly',
+        status: (meta.hasViewport || (d.technical && d.technical.mobile)) ? 'good' : 'bad',
+        msg: (meta.hasViewport || (d.technical && d.technical.mobile)) ? 'Meta viewport configurado' : 'Meta viewport ausente — indexacao mobile-first prejudicada' },
+
+      { group: 'Tecnico', label: 'Dados Estruturados',
+        status: (meta.schemaCount || 0) > 0 ? 'good' : 'warn',
+        msg: (meta.schemaCount || 0) > 0
+          ? (meta.schemaCount) + ' JSON-LD: ' + (meta.schemaTypes || []).join(', ')
+          : 'Nenhum Schema.org encontrado — rich snippets nao disponiveis' },
+
+      { group: 'Tecnico', label: 'Scripts Bloqueantes',
+        status: (perf.scriptsBlocking || 0) === 0 ? 'good' : (perf.scriptsBlocking || 0) <= 2 ? 'warn' : 'bad',
+        msg: (perf.scriptsBlocking || 0) === 0
+          ? 'Nenhum script render-blocking'
+          : (perf.scriptsBlocking) + ' script(s) bloqueando renderizacao (sem async/defer)' },
+
+      // ── Conteudo ───────────────────────────────────────────
+      { group: 'Conteudo', label: 'Volume de Conteudo',
         status: wc >= 300 ? 'good' : wc >= 100 ? 'warn' : 'bad',
-        msg: wc + ' palavras — ' + (d.keywords && d.keywords.readingTime || 0) + ' min leitura' + (wc < 300 ? ' (recomendado: 300+)' : '')
-      },
-      {
-        label: 'Tag Canonical',
-        status: tech.hasCanonical ? 'good' : 'warn',
-        msg: tech.hasCanonical ? 'Presente' : 'Ausente — recomendada para evitar conteudo duplicado'
-      },
-      {
-        label: 'Atributo Lang',
-        status: tech.lang ? 'good' : 'warn',
-        msg: tech.lang ? 'lang="' + tech.lang + '"' : 'Ausente na tag <html>'
-      }
+        msg: wc + ' palavras — ' + (d.keywords && d.keywords.readingTime || 0) + ' min leitura' },
+
+      { group: 'Conteudo', label: 'URL Limpa',
+        status: url.isClean ? 'good' : 'warn',
+        msg: url.isClean ? 'URL limpa e amigavel' :
+          [url.hasParams && 'tem parametros', url.hasUnderscores && 'tem underscores', url.hasUpperCase && 'tem maiusculas'].filter(Boolean).join(', ') || 'URL pode ser melhorada' },
+
+      { group: 'Conteudo', label: 'Textos Ancora',
+        status: (cq.poorAnchorTexts || 0) === 0 ? 'good' : 'warn',
+        msg: (cq.poorAnchorTexts || 0) === 0
+          ? 'Nenhum ancora generico detectado'
+          : (cq.poorAnchorTexts) + ' ancora(s) genericos ("clique aqui", "saiba mais", etc.)' },
     ];
 
     const icons = { good: '✓', warn: '!', bad: '✕' };
@@ -217,19 +458,61 @@ class PopupManager {
   }
 
   calcScore() {
-    const d = this.data;
+    const d    = this.data;
     const meta = d.meta || {};
-    const tech = d.technical || {};
     const img  = d.images || {};
-    let s = 3;
-    if (meta.titleOptimal) s++;
-    if (meta.descriptionOptimal) s++;
-    if ((d.headings && d.headings.distribution && d.headings.distribution.h1) === 1) s++;
-    if (tech.isHTTPS) s++;
-    if (tech.mobile) s++;
-    if (img.total === 0 || (img.withAlt / img.total) >= 0.8) s++;
-    if ((d.keywords && d.keywords.wordCount) >= 300) s++;
-    return Math.min(s, 10);
+    const h    = d.headings || {};
+    const h1   = (h.distribution && h.distribution.h1) || 0;
+    const wc   = (d.keywords && d.keywords.wordCount) || 0;
+    const url  = d.url_analysis || {};
+    const perf = d.performance || {};
+    const og   = meta.og || {};
+    const cq   = d.contentQuality || {};
+    const isHTTPS  = url.isHTTPS || (d.technical && d.technical.isHTTPS);
+    const isMobile = meta.hasViewport || (d.technical && d.technical.mobile);
+    let ded = 0;
+
+    // Meta
+    if (!meta.title) ded += 2; else if (!meta.titleOptimal) ded += 0.8;
+    if (!meta.description) ded += 2; else if (!meta.descriptionOptimal) ded += 0.8;
+    if (!meta.hasCanonical) ded += 0.5;
+    if (meta.isNoindex) ded += 1.5;
+    if (!meta.hasCharset) ded += 0.2;
+    if (!meta.hasFavicon) ded += 0.3;
+    if (!meta.lang) ded += 0.3;
+
+    // Social
+    const ogScore = og.score || 0;
+    if (ogScore < 2) ded += 0.5; else if (ogScore < 4) ded += 0.2;
+    if (!og.image) ded += 0.3;
+    if (!(meta.tw && meta.tw.present)) ded += 0.3;
+
+    // Headings
+    if (h1 === 0) ded += 1.5; else if (h1 > 1) ded += 0.5;
+    if (!h.hasH2) ded += 0.3;
+    if (h.hierarchyIssues && h.hierarchyIssues.length) ded += 0.3;
+
+    // Images
+    if (img.total > 0) {
+      if ((img.altCoverage || 0) < 50) ded += 1;
+      else if ((img.altCoverage || 0) < 80) ded += 0.5;
+      if ((img.lazyCoverage || 0) < 30) ded += 0.3;
+      if ((img.webpCoverage || 0) < 20) ded += 0.2;
+    }
+
+    // Technical
+    if (!isHTTPS) ded += 2;
+    if (!isMobile) ded += 1.5;
+    if ((meta.schemaCount || 0) === 0) ded += 0.3;
+    const blocking = perf.scriptsBlocking || 0;
+    if (blocking > 2) ded += 0.5; else if (blocking > 0) ded += 0.2;
+
+    // Content
+    if (wc < 100) ded += 1; else if (wc < 300) ded += 0.5;
+    if ((cq.poorAnchorTexts || 0) > 0) ded += 0.3;
+    if (!url.isClean) ded += 0.3;
+
+    return Math.max(0, Math.round((10 - ded) * 10) / 10);
   }
 
   scoreClass(s) { return s >= 8 ? 'green' : s >= 5 ? 'amber' : 'red'; }
@@ -403,16 +686,28 @@ class PopupManager {
   }
 
   buildActionPlan() {
-    const d = this.data;
+    const d    = this.data;
     const meta = d.meta || {};
-    const tech = d.technical || {};
     const img  = d.images || {};
+    const h    = d.headings || {};
+    const h1   = (h.distribution && h.distribution.h1) || 0;
     const kw   = d.keywords || {};
-    const h1   = (d.headings && d.headings.distribution && d.headings.distribution.h1) || 0;
+    const url  = d.url_analysis || {};
+    const perf = d.performance || {};
+    const og   = meta.og || {};
+    const cq   = d.contentQuality || {};
+    const isHTTPS  = url.isHTTPS || (d.technical && d.technical.isHTTPS);
+    const isMobile = meta.hasViewport || (d.technical && d.technical.mobile);
     const acts = [];
 
-    if (!tech.isHTTPS)
+    if (!isHTTPS)
       acts.push({ p: 'critico', impact: 'Alto', text: 'Migrar para HTTPS. SSL e fator de ranqueamento confirmado pelo Google e aumenta a confianca do usuario.' });
+
+    if (!isMobile)
+      acts.push({ p: 'critico', impact: 'Alto', text: "Adicionar <meta name='viewport' content='width=device-width, initial-scale=1'>. Google usa indexacao mobile-first." });
+
+    if (meta.isNoindex)
+      acts.push({ p: 'critico', impact: 'Alto', text: 'Meta robots com NOINDEX detectado. Esta pagina nao sera indexada pelo Google. Remova o noindex se deseja que ela apareca nos resultados.' });
 
     if (!meta.title)
       acts.push({ p: 'critico', impact: 'Alto', text: 'Adicionar tag <title> com 30-60 caracteres incluindo a palavra-chave principal logo no inicio.' });
@@ -433,21 +728,57 @@ class PopupManager {
     else if (h1 > 1)
       acts.push({ p: 'importante', impact: 'Medio', text: 'Manter apenas 1 H1 por pagina (atual: ' + h1 + '). Use H2 e H3 para subtitulos hierarquicos.' });
 
-    if (!tech.mobile)
-      acts.push({ p: 'critico', impact: 'Alto', text: "Adicionar <meta name='viewport' content='width=device-width, initial-scale=1'>. Google usa indexacao mobile-first." });
+    if (!meta.hasCanonical)
+      acts.push({ p: 'recomendado', impact: 'Medio', text: "Adicionar <link rel='canonical' href='URL'> para evitar penalizacao por conteudo duplicado." });
 
-    const missing = img.missingAlt || 0;
-    const total   = img.total || 0;
-    if (missing > 0)
-      acts.push({ p: missing > total * 0.5 ? 'importante' : 'recomendado', impact: 'Medio', text: 'Adicionar atributo alt em ' + missing + ' imagem(ns). Alt text melhora acessibilidade e indexacao de imagens.' });
+    const ogScore = og.score || 0;
+    if (ogScore < 2)
+      acts.push({ p: 'importante', impact: 'Medio', text: 'Configurar tags Open Graph (og:title, og:description, og:image, og:url). Essenciais para exibicao correta no Facebook, LinkedIn e WhatsApp.' });
+    else if (ogScore < 4) {
+      const missing4 = [!og.title && 'og:title', !og.description && 'og:description', !og.image && 'og:image', !og.url && 'og:url'].filter(Boolean);
+      acts.push({ p: 'recomendado', impact: 'Medio', text: 'Completar tags Open Graph — faltam: ' + missing4.join(', ') });
+    }
+
+    if (!og.image && ogScore >= 2)
+      acts.push({ p: 'importante', impact: 'Medio', text: 'Adicionar og:image (1200x630px). Sem imagem de compartilhamento o link fica sem preview visual nas redes sociais.' });
+
+    if (!(meta.tw && meta.tw.present))
+      acts.push({ p: 'recomendado', impact: 'Medio', text: "Adicionar Twitter Cards (<meta name='twitter:card' content='summary_large_image'>) para melhor preview no Twitter/X." });
+
+    const missingAlt = img.missingAlt || 0;
+    const total      = img.total || 0;
+    if (missingAlt > 0)
+      acts.push({ p: missingAlt > total * 0.5 ? 'importante' : 'recomendado', impact: 'Medio', text: 'Adicionar atributo alt em ' + missingAlt + ' imagem(ns). Alt text melhora acessibilidade e indexacao de imagens.' });
+
+    if (total > 0 && (img.lazyCoverage || 0) < 30)
+      acts.push({ p: 'recomendado', impact: 'Medio', text: 'Adicionar loading="lazy" nas imagens (' + (img.lazyCoverage || 0) + '% de cobertura atual). Reduz o tempo de carregamento inicial.' });
+
+    if (total > 0 && (img.webpCoverage || 0) < 20)
+      acts.push({ p: 'recomendado', impact: 'Medio', text: 'Converter imagens para formato WebP (' + (img.webpCoverage || 0) + '% de cobertura atual). WebP reduz o tamanho em 25-34% vs JPEG/PNG.' });
+
+    if ((meta.schemaCount || 0) === 0)
+      acts.push({ p: 'recomendado', impact: 'Alto', text: 'Adicionar dados estruturados JSON-LD (Schema.org). Habilita rich snippets no Google: estrelas, FAQ, breadcrumbs, etc.' });
+
+    const blocking = perf.scriptsBlocking || 0;
+    if (blocking > 0)
+      acts.push({ p: blocking > 2 ? 'importante' : 'recomendado', impact: 'Medio', text: 'Adicionar atributo async ou defer em ' + blocking + ' script(s) bloqueantes. Scripts sem async/defer atrasam o First Contentful Paint.' });
 
     if ((kw.wordCount || 0) < 300)
       acts.push({ p: 'recomendado', impact: 'Medio', text: 'Aumentar o conteudo da pagina (atual: ' + (kw.wordCount || 0) + ' palavras). Paginas com 300+ palavras tendem a ranquear melhor.' });
 
-    if (!tech.hasCanonical)
-      acts.push({ p: 'recomendado', impact: 'Medio', text: "Adicionar <link rel='canonical' href='URL'> para evitar penalizacao por conteudo duplicado." });
+    if (h.hierarchyIssues && h.hierarchyIssues.length > 0)
+      acts.push({ p: 'recomendado', impact: 'Baixo', text: 'Corrigir hierarquia de headings: ' + h.hierarchyIssues.join('; ') });
 
-    if (!tech.lang)
+    if (!h.hasH2 && h1 > 0)
+      acts.push({ p: 'recomendado', impact: 'Baixo', text: 'Adicionar headings H2 para estruturar o conteudo em topicos. Facilita a leitura e o rastreamento.' });
+
+    if ((cq.poorAnchorTexts || 0) > 0)
+      acts.push({ p: 'recomendado', impact: 'Baixo', text: 'Substituir ' + cq.poorAnchorTexts + ' ancoras genericas ("clique aqui", "saiba mais") por textos descritivos com palavras-chave.' });
+
+    if (!meta.hasFavicon)
+      acts.push({ p: 'recomendado', impact: 'Baixo', text: 'Adicionar favicon ao site. Melhora o reconhecimento da marca nos resultados de busca e nas abas do navegador.' });
+
+    if (!meta.lang)
       acts.push({ p: 'recomendado', impact: 'Baixo', text: "Adicionar atributo lang na tag <html> (ex: lang='pt-BR'). Ajuda buscadores a identificar o idioma da pagina." });
 
     return acts;

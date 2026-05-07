@@ -60,6 +60,7 @@
             <!-- ═══ ABA SEO ═══════════════════════════════════ -->
             <div id="tab-seo" class="tab-pane active">
 
+                <!-- Score -->
                 <div class="score-card">
                     <div class="score-circle">
                         <span id="scoreValue" class="score-number">--</span>
@@ -71,42 +72,79 @@
                     </div>
                 </div>
 
+                <!-- Meta Tags -->
                 <div class="card">
                     <h3 class="card-title">Meta Tags</h3>
 
                     <div class="meta-row">
-                        <div class="meta-row-head">
-                            <span class="meta-lbl">Title</span>
-                            <span id="titleBadge" class="len-badge"></span>
-                        </div>
+                        <div class="meta-row-head"><span class="meta-lbl">Title</span><span id="titleBadge" class="len-badge"></span></div>
                         <p id="titleContent" class="meta-text"></p>
                     </div>
-
                     <div class="meta-row">
-                        <div class="meta-row-head">
-                            <span class="meta-lbl">Meta Description</span>
-                            <span id="descBadge" class="len-badge"></span>
-                        </div>
+                        <div class="meta-row-head"><span class="meta-lbl">Meta Description</span><span id="descBadge" class="len-badge"></span></div>
                         <p id="descContent" class="meta-text"></p>
                     </div>
-
-                    <div id="h1Block" class="meta-row" style="display:none">
-                        <div class="meta-row-head">
-                            <span class="meta-lbl">H1</span>
-                        </div>
-                        <p id="h1Content" class="meta-text"></p>
+                    <div class="meta-row">
+                        <div class="meta-row-head"><span class="meta-lbl">Canonical</span><span id="canonicalBadge" class="len-badge"></span></div>
+                        <p id="canonicalContent" class="meta-text small absent"></p>
                     </div>
-
-                    <div id="canonicalBlock" class="meta-row" style="display:none">
-                        <div class="meta-row-head">
-                            <span class="meta-lbl">Canonical</span>
-                        </div>
-                        <p id="canonicalContent" class="meta-text small"></p>
+                    <div class="meta-row">
+                        <div class="meta-row-head"><span class="meta-lbl">Robots</span></div>
+                        <p id="robotsContent" class="meta-text small"></p>
+                    </div>
+                    <div class="meta-two-col">
+                        <div class="meta-mini" id="charsetMini"></div>
+                        <div class="meta-mini" id="faviconMini"></div>
+                        <div class="meta-mini" id="ampMini"></div>
+                        <div class="meta-mini" id="hreflangMini"></div>
                     </div>
                 </div>
 
+                <!-- Open Graph -->
                 <div class="card">
-                    <h3 class="card-title">Verificacoes</h3>
+                    <h3 class="card-title">Open Graph & Twitter Card</h3>
+                    <div class="og-grid" id="ogGrid"></div>
+                    <div class="meta-row" style="margin-top:10px">
+                        <div class="meta-row-head"><span class="meta-lbl">Twitter Card</span><span id="twBadge" class="len-badge"></span></div>
+                        <div id="twContent"></div>
+                    </div>
+                </div>
+
+                <!-- Headings -->
+                <div class="card">
+                    <h3 class="card-title">Estrutura de Headings</h3>
+                    <div id="headingDist" class="heading-dist"></div>
+                    <div id="headingTree" class="heading-tree"></div>
+                </div>
+
+                <!-- Images -->
+                <div class="card">
+                    <h3 class="card-title">Imagens</h3>
+                    <div id="imageStats" class="img-stats-grid"></div>
+                    <div id="imageMissingAlt" style="margin-top:8px"></div>
+                </div>
+
+                <!-- URL -->
+                <div class="card">
+                    <h3 class="card-title">URL</h3>
+                    <div id="urlAnalysis"></div>
+                </div>
+
+                <!-- Performance -->
+                <div class="card">
+                    <h3 class="card-title">Performance & Recursos</h3>
+                    <div id="perfStats"></div>
+                </div>
+
+                <!-- Structured Data -->
+                <div class="card" id="schemaCard">
+                    <h3 class="card-title">Dados Estruturados (Schema)</h3>
+                    <div id="schemaInfo"></div>
+                </div>
+
+                <!-- Checks -->
+                <div class="card">
+                    <h3 class="card-title">Todas as Verificacoes</h3>
                     <div id="checksContainer"></div>
                 </div>
 
