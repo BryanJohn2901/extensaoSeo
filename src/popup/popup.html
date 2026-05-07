@@ -10,8 +10,11 @@
     <div class="popup-container">
 
         <div class="popup-header">
-            <h1>SEO Analyzer</h1>
-            <button id="settingsBtn" class="settings-btn">&#9881;</button>
+            <div class="header-left">
+                <h1>SEO Analyzer Pro</h1>
+                <small id="urlDisplay" class="header-url"></small>
+            </div>
+            <button id="reloadBtn" class="reload-btn" title="Reanalisar">&#8635;</button>
         </div>
 
         <div id="loading" class="loading">
@@ -21,89 +24,156 @@
 
         <div id="results" class="results" style="display: none;">
 
-            <div class="result-item">
-                <small class="label">URL ANALISADA</small>
-                <p id="urlDisplay" class="url-text"></p>
-            </div>
-
-            <div class="result-item score-card">
-                <h3>Score SEO</h3>
+            <!-- SCORE -->
+            <div class="score-card">
                 <div class="score-circle">
                     <span id="scoreValue" class="score-number">--</span>
-                    <span class="score-text">/10</span>
+                    <span class="score-denom">/10</span>
                 </div>
-                <p id="scoreMsg" class="score-message"></p>
+                <div class="score-info">
+                    <div id="scoreBar" class="score-bar"><div id="scoreFill" class="score-fill"></div></div>
+                    <p id="scoreMsg" class="score-message"></p>
+                </div>
             </div>
 
-            <div class="results-section">
+            <!-- META TAGS -->
+            <div class="section">
+                <h3 class="section-title">Meta Tags</h3>
+
+                <div class="meta-block">
+                    <div class="meta-header">
+                        <span class="meta-label">Title Tag</span>
+                        <span id="titleBadge" class="length-badge"></span>
+                    </div>
+                    <p id="titleContent" class="meta-value"></p>
+                </div>
+
+                <div class="meta-block">
+                    <div class="meta-header">
+                        <span class="meta-label">Meta Description</span>
+                        <span id="descBadge" class="length-badge"></span>
+                    </div>
+                    <p id="descContent" class="meta-value muted"></p>
+                </div>
+
+                <div id="canonicalBlock" class="meta-block" style="display:none;">
+                    <div class="meta-header">
+                        <span class="meta-label">Canonical</span>
+                    </div>
+                    <p id="canonicalContent" class="meta-value muted small"></p>
+                </div>
+            </div>
+
+            <!-- VERIFICACOES -->
+            <div class="section">
                 <h3 class="section-title">Verificacoes</h3>
 
-                <div class="check-item">
-                    <span id="titleCheck" class="check-icon">&#9888;</span>
+                <div class="check-item" id="check-title">
+                    <span class="check-icon"></span>
                     <div class="check-content">
                         <strong>Title Tag</strong>
                         <small id="titleMsg"></small>
                     </div>
                 </div>
 
-                <div class="check-item">
-                    <span id="descCheck" class="check-icon">&#9888;</span>
+                <div class="check-item" id="check-desc">
+                    <span class="check-icon"></span>
                     <div class="check-content">
                         <strong>Meta Description</strong>
                         <small id="descMsg"></small>
                     </div>
                 </div>
 
-                <div class="check-item">
-                    <span id="h1Check" class="check-icon">&#9888;</span>
+                <div class="check-item" id="check-h1">
+                    <span class="check-icon"></span>
                     <div class="check-content">
                         <strong>H1 Heading</strong>
                         <small id="h1Msg"></small>
                     </div>
                 </div>
 
-                <div class="check-item">
-                    <span id="mobileCheck" class="check-icon">&#9888;</span>
+                <div class="check-item" id="check-https">
+                    <span class="check-icon"></span>
+                    <div class="check-content">
+                        <strong>HTTPS / SSL</strong>
+                        <small id="httpsMsg"></small>
+                    </div>
+                </div>
+
+                <div class="check-item" id="check-mobile">
+                    <span class="check-icon"></span>
                     <div class="check-content">
                         <strong>Mobile Friendly</strong>
                         <small id="mobileMsg"></small>
                     </div>
                 </div>
 
-                <div class="check-item">
-                    <span id="httpsCheck" class="check-icon">&#9888;</span>
+                <div class="check-item" id="check-images">
+                    <span class="check-icon"></span>
                     <div class="check-content">
-                        <strong>HTTPS/SSL</strong>
-                        <small id="httpsMsg"></small>
-                    </div>
-                </div>
-
-                <div class="check-item">
-                    <span id="imagesCheck" class="check-icon">&#9888;</span>
-                    <div class="check-content">
-                        <strong>Image Alt Text</strong>
+                        <strong>Alt Text em Imagens</strong>
                         <small id="imagesMsg"></small>
                     </div>
                 </div>
 
-                <div class="check-item">
-                    <span id="wordCountCheck" class="check-icon">&#8505;</span>
+                <div class="check-item" id="check-content">
+                    <span class="check-icon"></span>
                     <div class="check-content">
-                        <strong>Conteudo</strong>
+                        <strong>Volume de Conteudo</strong>
                         <small id="wordCountMsg"></small>
+                    </div>
+                </div>
+
+                <div class="check-item" id="check-canonical">
+                    <span class="check-icon"></span>
+                    <div class="check-content">
+                        <strong>Tag Canonical</strong>
+                        <small id="canonicalMsg"></small>
+                    </div>
+                </div>
+
+                <div class="check-item" id="check-lang">
+                    <span class="check-icon"></span>
+                    <div class="check-content">
+                        <strong>Atributo Lang</strong>
+                        <small id="langMsg"></small>
                     </div>
                 </div>
             </div>
 
+            <!-- PALAVRAS-CHAVE -->
+            <div class="section">
+                <h3 class="section-title">Palavras-chave da Pagina</h3>
+                <p class="section-subtitle">Termos mais frequentes no conteudo (stop words removidas)</p>
+                <div id="keywordsTable" class="keywords-table"></div>
+                <div class="content-stats">
+                    <span id="wordCountStat"></span>
+                    <span id="readingTimeStat"></span>
+                    <span id="paragraphsStat"></span>
+                </div>
+            </div>
+
+            <!-- PLANO DE ACAO -->
+            <div class="section">
+                <h3 class="section-title">Plano de Acao</h3>
+                <p class="section-subtitle">Acoes priorizadas para melhorar seu SEO</p>
+                <div id="actionPlan" class="action-plan"></div>
+                <div id="allGood" class="all-good" style="display:none;">
+                    <p>Tudo certo! Nenhuma acao critica identificada.</p>
+                </div>
+            </div>
+
+            <!-- ACOES -->
             <div class="popup-actions">
                 <button id="exportBtn" class="btn btn-secondary">Exportar JSON</button>
-                <button id="reloadBtn" class="btn btn-primary">Recarregar</button>
             </div>
+
         </div>
 
         <div id="error" class="error-message" style="display: none;">
             <p>Erro ao analisar pagina</p>
             <small id="errorMsg"></small>
+            <button id="retryBtn" class="btn btn-primary" style="margin-top:12px;">Tentar novamente</button>
         </div>
 
     </div>
