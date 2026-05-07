@@ -76,25 +76,42 @@
 ═══════════════════════════════════════════════════ */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-html { color-scheme: light dark; }
+html {
+  color-scheme: light dark;
+  height: 100%;
+}
 
 body {
   width: 460px;
+  max-height: min(640px, 100vh);
+  margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
   background: var(--bg-page);
   color: var(--text-1);
   font-size: 13px;
   line-height: 1.5;
   transition: background-color 0.3s, color 0.2s;
+  overflow: hidden;
 }
 
 /* ═══════════════════════════════════════════════════
    CONTAINER
 ═══════════════════════════════════════════════════ */
 .popup-container {
-  max-height: 640px;
   display: flex;
   flex-direction: column;
+  max-height: min(640px, 100vh);
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Área principal: precisa min-height:0 para o scroll funcionar dentro das abas (flexbox). */
+#main {
+  display: none;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -172,6 +189,8 @@ body {
    LOADING
 ═══════════════════════════════════════════════════ */
 .loading {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -197,6 +216,7 @@ body {
 ═══════════════════════════════════════════════════ */
 .error-state {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -205,6 +225,7 @@ body {
   text-align: center;
   gap: 8px;
   background: var(--bg-page);
+  overflow-y: auto;
 }
 .error-icon {
   width: 40px; height: 40px;
@@ -285,8 +306,11 @@ body {
    TAB CONTENT
 ═══════════════════════════════════════════════════ */
 .tab-contents {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   background: var(--bg-page);
   transition: background-color 0.3s;
 }
@@ -296,15 +320,21 @@ body {
   flex-direction: column;
   gap: 8px;
   padding: 10px;
-  height: 100%;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
 
 .tab-pane.active { display: flex; }
 
-.tab-pane::-webkit-scrollbar { width: 4px; }
+.tab-pane::-webkit-scrollbar { width: 6px; }
 .tab-pane::-webkit-scrollbar-track { background: transparent; }
-.tab-pane::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.tab-pane::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
 /* ═══════════════════════════════════════════════════
    CARDS
@@ -1167,7 +1197,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 84%;
+  max-height: min(84vh, 560px);
+  min-height: 0;
+  overflow: hidden;
   border-top: 1px solid var(--border);
   box-shadow: 0 -8px 30px rgba(0,0,0,0.15);
   transition: background-color 0.3s;
@@ -1192,8 +1224,10 @@ body {
 .modal-sub { font-size: 11px; color: var(--text-3); margin-top: -4px; }
 
 .prompt-textarea {
-  flex: 1;
-  min-height: 310px;
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
   resize: none;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
