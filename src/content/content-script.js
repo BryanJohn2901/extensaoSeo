@@ -65,6 +65,7 @@ const SEOAnalyzer = {
       lang:            document.documentElement.getAttribute('lang') || '',
       hasFavicon:      !!( get('link[rel="icon"]') || get('link[rel="shortcut icon"]') || get('link[rel="apple-touch-icon"]') ),
       hasAMP:          !!( get('link[rel="amphtml"]') || document.documentElement.hasAttribute('amp') ),
+      hasViewport:     !!get('meta[name="viewport"]'),
 
       // Social
       og,
@@ -360,6 +361,10 @@ const SEOAnalyzer = {
         performance:    this.analyzePerformance(),
         contentQuality: this.analyzeContentQuality(),
         tags:           this.analyzeTags(),
+        technical: {
+          mobile: !!document.querySelector('meta[name="viewport"]'),
+          isHTTPS: window.location.protocol === 'https:',
+        },
       };
     } catch (err) {
       console.error('SEO Analyzer error:', err);

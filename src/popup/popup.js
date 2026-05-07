@@ -990,52 +990,61 @@ Se precisar de mais contexto sobre o site para personalizar as sugestoes, pergun
 document.addEventListener('DOMContentLoaded', () => new PopupManager());
 
 // ─── MAIN-WORLD TAG DETECTOR ──────────────────────────────────────────────────
-// Esta funcao e serializada e injetada no contexto JS real da pagina
-// (world: "MAIN"), permitindo acesso a window.gtag, window.fbq, etc.
+// Serializada via executeScript (world: "MAIN"). NAO usar for..of nem helpers do Babel:
+// o corpo enviado a pagina nao leva closures — iterators viram chamadas a funcoes inexistentes.
 function detectTagsInPageContext() {
   const tags = [];
-  const add = (name, category, id) => tags.push({ name, category, id: id || '' });
+  function add(name, category, id) {
+    tags.push({ name: name, category: category, id: id || '' });
+  }
 
   try {
     // ── Google Tag Manager ──────────────────────────────────────
     if (window.google_tag_manager) {
-      const ids = Object.keys(window.google_tag_manager).filter(k => /^GTM-/.test(k));
-      ids.length ? ids.forEach(id => add('Google Tag Manager', 'Tag Manager', id))
-                 : add('Google Tag Manager', 'Tag Manager', '');
+      const ids = Object.keys(window.google_tag_manager).filter(function (k) { return /^GTM-/.test(k); });
+      if (ids.length) {
+        for (var gi = 0; gi < ids.length; gi++) add('Google Tag Manager', 'Tag Manager', ids[gi]);
+      } else {
+        add('Google Tag Manager', 'Tag Manager', '');
+      }
     } else if (Array.isArray(window.dataLayer)) {
       add('Google Tag Manager', 'Tag Manager', '');
     }
 
-    // ── Google Analytics 4 ──────────────────────────────────────
-    if (typeof window.gtag === 'function') {
-      let id = '';
-      if (Array.isArray(window.dataLayer)) {
-        for (const item of window.dataLayer) {
-          if (Array.isArray(item) && item[0] === 'config' && typeof item[1] === 'string' && item[1].startsWith('G-')) {
-            id = item[1]; break;
-          }
+    function scanDataLayer(prefix) {
+      const dl = window.dataLayer;
+      if (!Array.isArray(dl)) return '';
+      for (var i = 0; i < dl.length; i++) {
+        var item = dl[i];
+        if (Array.isArray(item) && item[0] === 'config' && typeof item[1] === 'string' && item[1].indexOf(prefix) === 0) {
+          return item[1];
         }
       }
-      add('Google Analytics 4', 'Analytics', id);
+      return '';
+    }
+
+    // ── Google Analytics 4 ──────────────────────────────────────
+    if (typeof window.gtag === 'function') {
+      add('Google Analytics 4', 'Analytics', scanDataLayer('G-'));
     }
 
     // ── Google Analytics Universal ───────────────────────────────
     if (typeof window.ga === 'function' || typeof window.GoogleAnalyticsObject !== 'undefined') {
-      let id = '';
+      var idUa = '';
       try {
-        const obj = window.GoogleAnalyticsObject ? window[window.GoogleAnalyticsObject] : window.ga;
-        if (obj && obj.getAll) id = (obj.getAll()[0] || {get: () => ''}).get('trackingId') || '';
-      } catch (e) {}
-      add('Google Analytics Universal', 'Analytics', id);
+        var obj = window.GoogleAnalyticsObject ? window[window.GoogleAnalyticsObject] : window.ga;
+        if (obj && obj.getAll) {
+          var first = obj.getAll()[0];
+          idUa = first && typeof first.get === 'function' ? (first.get('trackingId') || '') : '';
+        }
+      } catch (errUa) {}
+      add('Google Analytics Universal', 'Analytics', idUa);
     }
 
     // ── Google Ads ───────────────────────────────────────────────
     if (typeof window.gtag === 'function' && Array.isArray(window.dataLayer)) {
-      for (const item of window.dataLayer) {
-        if (Array.isArray(item) && item[0] === 'config' && typeof item[1] === 'string' && item[1].startsWith('AW-')) {
-          add('Google Ads', 'Ads', item[1]); break;
-        }
-      }
+      var aw = scanDataLayer('AW-');
+      if (aw) add('Google Ads', 'Ads', aw);
     }
 
     // ── Facebook Pixel ───────────────────────────────────────────
