@@ -346,6 +346,141 @@ const SEOAnalyzer = {
     return found;
   },
 
+  // ── TECH STACK (heuristic from DOM, scripts, meta) ───────────
+  analyzeTechnologies() {
+    const items = [];
+    const seen = new Set();
+    const dedupeKey = (name) => {
+      const n = String(name).toLowerCase();
+      if (n.includes('wordpress')) return 'wordpress';
+      if (n.includes('next.js') || n === 'next') return 'next.js';
+      return n.trim();
+    };
+    const add = (name, category, evidence) => {
+      const key = dedupeKey(name);
+      if (seen.has(key)) return;
+      seen.add(key);
+      items.push({ name, category, evidence: evidence || '' });
+    };
+
+    const scriptSrc = Array.from(document.querySelectorAll('script[src]')).map(s => (s.getAttribute('src') || '').toLowerCase());
+    const styleHref = Array.from(document.querySelectorAll('link[rel="stylesheet"][href]')).map(l => (l.getAttribute('href') || '').toLowerCase());
+    const preloadHref = Array.from(document.querySelectorAll('link[rel="preload"][href]')).map(l => (l.getAttribute('href') || '').toLowerCase());
+    const scriptInline = Array.from(document.querySelectorAll('script:not([src])'))
+      .map(s => s.textContent || '').join('\n').slice(0, 80000);
+    const headHtml = (document.head && document.head.innerHTML) ? document.head.innerHTML.slice(0, 120000) : '';
+    const bodyHtml = (document.body && document.body.innerHTML) ? document.body.innerHTML.slice(0, 80000) : '';
+    const haystack = scriptSrc.join(' ') + ' ' + styleHref.join(' ') + ' ' + preloadHref.join(' ') + ' ' + headHtml + ' ' + bodyHtml.slice(0, 40000) + ' ' + scriptInline.slice(0, 35000);
+    const haySmall = haystack.toLowerCase();
+
+    // DOM / markup hints (strong signals)
+    if (document.getElementById('__next') || /<script[^>]+id=["']__NEXT_DATA__["']/i.test(headHtml)) add('Next.js', 'Framework', '__NEXT_DATA__ / #__next');
+    if (document.getElementById('__NUXT__') || /\/_nuxt\//i.test(haySmall)) add('Nuxt', 'Framework', '__NUXT__ / _nuxt');
+    if (document.getElementById('___gatsby') || /___gatsby/i.test(bodyHtml)) add('Gatsby', 'Framework', 'Gatsby');
+    if (document.querySelector('[data-reactroot], [data-react-helmet]') || /\breact-dom\b/i.test(haystack)) add('React', 'Frontend', 'DOM / scripts');
+    if (document.documentElement.getAttribute('ng-version')) add('Angular', 'Frontend', 'ng-version');
+    if (document.querySelector('[data-v-]') && /vue/i.test(haySmall)) add('Vue.js', 'Frontend', 'data-v-* / vue');
+    if (/\bsvelte\b/i.test(haystack) || document.querySelector('[class*="svelte-"]')) add('Svelte', 'Frontend', 'Svelte');
+    if (/astro\b/i.test(haySmall) || document.querySelector('astro-island, astro-slot')) add('Astro', 'Framework', 'Astro');
+    if (document.querySelector('#wpadminbar, link[href*="wp-content"], script[src*="wp-content"], script[src*="wp-includes"]')) add('WordPress', 'CMS', 'wp-* paths');
+    if (document.querySelector('meta[name="generator"][content*="WordPress"]')) add('WordPress', 'CMS', 'meta generator');
+
+    // Pattern table: [regex, name, category]
+    const RULES = [
+      [/wp-content\/themes|wp-includes\/js/i, 'WordPress', 'CMS'],
+      [/woocommerce|wc-add-to-cart/i, 'WooCommerce', 'E-commerce'],
+      [/cdn\.shopify|shopifycdn/i, 'Shopify', 'E-commerce'],
+      [/squarespace/i, 'Squarespace', 'CMS'],
+      [/static\.wixstatic|parastorage|wix\.com\/script/i, 'Wix', 'CMS'],
+      [/elementor|elementorFrontend/i, 'Elementor', 'Page builder'],
+      [/drupal\.js|sites\/default\/files/i, 'Drupal', 'CMS'],
+      [/joomla/i, 'Joomla', 'CMS'],
+      [/ghost\.org|ghost\.io\/.*ghost/i, 'Ghost', 'CMS'],
+      [/webflow\.com|webflow\.io/i, 'Webflow', 'CMS'],
+      [/hubspot.*cms|hs-scripts\.com/i, 'HubSpot CMS', 'CMS'],
+      [/framer\.com|framerusercontent/i, 'Framer', 'CMS'],
+      [/bigcommerce|bigcommerce\.com/i, 'BigCommerce', 'E-commerce'],
+      [/magento|mage\.cookies/i, 'Magento', 'E-commerce'],
+      [/prestashop/i, 'PrestaShop', 'E-commerce'],
+      [/hotwired|turbo\.min|stimulus/i, 'Hotwire / Turbo', 'Frontend'],
+      [/alpine\.js|unpkg\.com\/alpinejs/i, 'Alpine.js', 'Biblioteca JS'],
+      [/htmx\.org|htmx\.min/i, 'htmx', 'Biblioteca JS'],
+      [/jquery(?:\.min)?\.js|jquery-ui/i, 'jQuery', 'Biblioteca JS'],
+      [/lodash|underscore\.min/i, 'Lodash / Underscore', 'Biblioteca JS'],
+      [/moment(?:\.min)?\.js|dayjs\.min/i, 'Moment / Day.js', 'Biblioteca JS'],
+      [/axios\.min|axios\.dist/i, 'Axios', 'Biblioteca JS'],
+      [/bootstrap(?:\.min)?\.css|getbootstrap\.com/i, 'Bootstrap', 'CSS / UI'],
+      [/tailwind(?:css)?|cdn\.tailwindcss/i, 'Tailwind CSS', 'CSS / UI'],
+      [/@mui\/|material-ui|mui\.com/i, 'Material UI', 'CSS / UI'],
+      [/chakra-ui|chakra-ui\.com/i, 'Chakra UI', 'CSS / UI'],
+      [/radix-ui/i, 'Radix UI', 'CSS / UI'],
+      [/antd\.min|ant-design/i, 'Ant Design', 'CSS / UI'],
+      [/bulma\.min/i, 'Bulma', 'CSS / UI'],
+      [/foundation\.min|foundation\.js/i, 'Foundation', 'CSS / UI'],
+      [/fontawesome|font-awesome|kit\.fontawesome/i, 'Font Awesome', 'Fontes / Icones'],
+      [/fonts\.googleapis\.com/i, 'Google Fonts', 'Fontes / Icones'],
+      [/styled-components|emotion/i, 'CSS-in-JS (styled/emotion)', 'CSS / UI'],
+      [/webpack\.runtime|__webpack_require__/i, 'Webpack', 'Build'],
+      [/vite\/client|@vitejs/i, 'Vite', 'Build'],
+      [/rollup/i, 'Rollup (indicio)', 'Build'],
+      [/parcel/i, 'Parcel (indicio)', 'Build'],
+      [/cloudflareinsights|__cf_bm/i, 'Cloudflare', 'Infra'],
+      [/amazonaws\.com|cloudfront\.net/i, 'AWS / CloudFront', 'Infra'],
+      [/fastly\.net/i, 'Fastly', 'Infra'],
+      [/vercel\.com|vercel-insights/i, 'Vercel', 'Infra'],
+      [/netlify\.com|netlify\.io/i, 'Netlify', 'Infra'],
+      [/rails-ujs|@rails\/|data-turbo/i, 'Ruby on Rails', 'Backend'],
+      [/laravel\.js|livewire/i, 'Laravel / Livewire', 'Backend'],
+      [/django\.static|__django__/i, 'Django', 'Backend'],
+      [/next\/static\/chunks/i, 'Next.js', 'Framework'],
+      [/remix_run|@remix-run/i, 'Remix', 'Framework'],
+      [/solid-js|solid\.js/i, 'SolidJS', 'Frontend'],
+      [/preact/i, 'Preact', 'Frontend'],
+      [/lit-element|lit-html/i, 'Lit', 'Frontend'],
+      [/ember\.js|ember-cli/i, 'Ember.js', 'Frontend'],
+      [/backbone\.js/i, 'Backbone.js', 'Frontend'],
+      [/socket\.io/i, 'Socket.io', 'Biblioteca JS'],
+      [/three\.min|three\.js/i, 'Three.js', 'Biblioteca JS'],
+      [/gsap|greensock/i, 'GSAP', 'Biblioteca JS'],
+      [/lenis|locomotive-scroll/i, 'Smooth scroll (Lenis/Loco)', 'Biblioteca JS'],
+      [/prismic\.io|prismic\.min/i, 'Prismic', 'CMS'],
+      [/contentful|ctfassets/i, 'Contentful', 'CMS'],
+      [/sanity\.io|sanity\.cdn/i, 'Sanity', 'CMS'],
+      [/strapi\.io/i, 'Strapi', 'CMS'],
+      [/tinymce|ckeditor/i, 'Editor WYSIWYG (TinyMCE/CKEditor)', 'CMS'],
+    ];
+
+    for (let r = 0; r < RULES.length; r++) {
+      const rule = RULES[r];
+      try {
+        if (rule[0].test(haystack)) add(rule[1], rule[2], 'scripts / links');
+      } catch (e) {}
+    }
+
+    const gen = document.querySelector('meta[name="generator"]');
+    if (gen && gen.content) {
+      const g = gen.content.trim();
+      if (g) add(g, 'CMS / Plataforma', 'meta generator');
+    }
+
+    const powered = document.querySelector('meta[name="powered-by"]');
+    if (powered && powered.content) add(powered.content.trim(), 'Infra', 'meta powered-by');
+
+    const catOrder = {
+      'Framework': 0, 'Frontend': 1, 'Backend': 2, 'CMS': 3, 'CMS / Plataforma': 4,
+      'E-commerce': 5, 'Page builder': 6, 'CSS / UI': 7, 'Biblioteca JS': 8,
+      'Fontes / Icones': 9, 'Build': 10, 'Infra': 11
+    };
+    items.sort((a, b) => {
+      const ca = catOrder[a.category] !== undefined ? catOrder[a.category] : 99;
+      const cb = catOrder[b.category] !== undefined ? catOrder[b.category] : 99;
+      if (ca !== cb) return ca - cb;
+      return a.name.localeCompare(b.name);
+    });
+
+    return items;
+  },
+
   // ── FULL ANALYSIS ────────────────────────────────────────────
   runFullAnalysis() {
     try {
@@ -362,6 +497,7 @@ const SEOAnalyzer = {
         contentQuality: this.analyzeContentQuality(),
         tags:           this.analyzeTags(),
         webhooks:       this.detectWebhooks(),
+        technologies:   this.analyzeTechnologies(),
         technical: {
           mobile: !!document.querySelector('meta[name="viewport"]'),
           isHTTPS: window.location.protocol === 'https:',

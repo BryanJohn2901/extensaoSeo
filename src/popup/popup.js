@@ -132,6 +132,7 @@ class PopupManager {
     this.renderSEO();
     this.renderTags();
     this.renderLinks();
+    this.renderTechnologies();
     this.renderContent();
     this.renderPlan();
     this.updateBadges();
@@ -644,6 +645,46 @@ class PopupManager {
     }
   }
 
+  escapeHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // ─── TECH TAB ────────────────────────────────────────────────
+
+  renderTechnologies() {
+    const list = this.data.technologies || [];
+    const el = document.getElementById('techList');
+    if (!el) return;
+
+    if (list.length === 0) {
+      el.innerHTML = '<p class="empty-msg">Nenhuma tecnologia identificada. Alguns sites carregam scripts dinamicamente — tente recarregar a pagina (F5) e abrir a extensao de novo.</p>';
+      return;
+    }
+
+    const grouped = {};
+    list.forEach(t => {
+      const cat = t.category || 'Outros';
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(t);
+    });
+
+    el.innerHTML = Object.entries(grouped).map(([cat, rows]) =>
+      '<div class="tech-group">' +
+        '<p class="tech-group-label">' + this.escapeHtml(cat) + '</p>' +
+        rows.map(r =>
+          '<div class="tech-item">' +
+            '<span class="tech-name">' + this.escapeHtml(r.name) + '</span>' +
+            (r.evidence ? '<span class="tech-evidence">' + this.escapeHtml(r.evidence) + '</span>' : '') +
+          '</div>'
+        ).join('') +
+      '</div>'
+    ).join('');
+  }
+
   // ─── LINKS TAB ───────────────────────────────────────────────
 
   renderLinks() {
@@ -857,10 +898,12 @@ class PopupManager {
     const actions = document.getElementById('actionPlan').children.length;
     const tagsCount = (this.data.tags || []).length;
     const redirectsCount = ((this.data.links || {}).redirects || []).length;
+    const techCount      = (this.data.technologies || []).length;
 
     this.setBadge('badge-seo',   issues,        'red');
     this.setBadge('badge-tags',  tagsCount,     'blue');
     this.setBadge('badge-links', redirectsCount,'orange');
+    this.setBadge('badge-tech',  techCount,     'blue');
     this.setBadge('badge-plan',  actions,       'red');
   }
 
@@ -941,6 +984,7 @@ class PopupManager {
     const list = (arr, icon) => arr.length ? arr.map((a, i) => `${icon} ${i + 1}. ${a.text}`).join('\n') : '  Nenhum';
 
     const tags = (d.tags || []).map(t => t.name + (t.id ? ` (${t.id})` : '')).join(', ') || 'Nenhuma detectada';
+    const techs = (d.technologies || []).map(t => t.name + (t.category ? ` [${t.category}]` : '')).join(', ') || 'Nenhuma detectada';
 
     const headingH1 = h.h1Texts && h.h1Texts[0] ? `"${h.h1Texts[0]}"` : '(ausente)';
     const schemaTypes = (meta.schemaTypes || []).join(', ') || 'Nenhum';
@@ -969,6 +1013,7 @@ ${line('  - Formato WebP', (img.webpCoverage || 0) + '% de cobertura')}
 ${line('Scripts bloqueantes', perf.scriptsBlocking || 0)}
 ${line('Volume de conteudo', (kw.wordCount || 0) + ' palavras')}
 ${line('Tags/Pixels detectados', tags)}
+${line('Tecnologias (heuristica)', techs)}
 
 ## Problemas Identificados
 
