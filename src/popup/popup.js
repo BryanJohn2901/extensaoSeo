@@ -19,26 +19,69 @@ class PopupManager {
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + id));
   }
 
-  requestAnalysis() {
+  async requestAnalysis() {
     document.getElementById('loading').style.display = 'flex';
     document.getElementById('main').style.display = 'none';
     document.getElementById('error').style.display = 'none';
 
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs[0]) return this.showError('Aba nao encontrada.');
+    const tabs = await new Promise(r => chrome.tabs.query({ active: true, currentWindow: true }, r));
+    if (!tabs[0]) return this.showError('Aba nao encontrada.');
+    const tabId = tabs[0].id;
 
-      chrome.tabs.sendMessage(tabs[0].id, { type: 'REQUEST_ANALYSIS' }, (response) => {
-        if (chrome.runtime.lastError) {
-          chrome.storage.local.get('lastAnalysis', (result) => {
-            result.lastAnalysis ? this.render(result.lastAnalysis) : this.showError('Recarregue a pagina (F5) e tente novamente.');
-          });
-        } else if (response && response.success && response.data) {
-          this.render(response.data);
-        } else {
-          this.showError('Erro ao obter dados da pagina.');
-        }
+    // DOM analysis (meta, headings, links, keywords, etc.)
+    const domData = await new Promise(resolve => {
+      chrome.tabs.sendMessage(tabId, { type: 'REQUEST_ANALYSIS' }, response => {
+        if (chrome.runtime.lastError) resolve(null);
+        else resolve(response && response.data || null);
       });
     });
+
+    if (!domData) {
+      const stored = await new Promise(r => chrome.storage.local.get('lastAnalysis', r));
+      if (stored.lastAnalysis) {
+        await this.enrichTagsViaScripting(stored.lastAnalysis, tabId);
+        return this.render(stored.lastAnalysis);
+      }
+      return this.showError('Recarregue a pagina (F5) e tente novamente.');
+    }
+
+    // JS-globals analysis — runs in the page's own JS context
+    await this.enrichTagsViaScripting(domData, tabId);
+    this.render(domData);
+  }
+
+  async enrichTagsViaScripting(data, tabId) {
+    try {
+      const results = await new Promise(resolve => {
+        chrome.scripting.executeScript(
+          { target: { tabId }, world: 'MAIN', func: detectTagsInPageContext },
+          res => {
+            if (chrome.runtime.lastError) resolve([]);
+            else resolve(res);
+          }
+        );
+      });
+      const jsTags = results && results[0] && results[0].result || [];
+      data.tags = this.mergeTags(data.tags || [], jsTags);
+    } catch (e) {
+      // scripting API not available on this page (chrome://, etc.)
+    }
+  }
+
+  mergeTags(domTags, jsTags) {
+    const merged = [];
+    const seen = new Set();
+    // JS globals take priority — they're post-load, reflect reality
+    jsTags.forEach(t => { if (!seen.has(t.name)) { seen.add(t.name); merged.push({ ...t }); } });
+    // DOM fallback for tags not yet initialized as globals
+    domTags.forEach(t => {
+      if (!seen.has(t.name)) { seen.add(t.name); merged.push({ ...t }); }
+      else if (t.id) {
+        const ex = merged.find(m => m.name === t.name);
+        if (ex && !ex.id) ex.id = t.id;
+      }
+    });
+    return merged;
   }
 
   render(data) {
@@ -459,3 +502,141 @@ class PopupManager {
 }
 
 document.addEventListener('DOMContentLoaded', () => new PopupManager());
+
+// ─── MAIN-WORLD TAG DETECTOR ──────────────────────────────────────────────────
+// Esta funcao e serializada e injetada no contexto JS real da pagina
+// (world: "MAIN"), permitindo acesso a window.gtag, window.fbq, etc.
+function detectTagsInPageContext() {
+  const tags = [];
+  const add = (name, category, id) => tags.push({ name, category, id: id || '' });
+
+  try {
+    // ── Google Tag Manager ──────────────────────────────────────
+    if (window.google_tag_manager) {
+      const ids = Object.keys(window.google_tag_manager).filter(k => /^GTM-/.test(k));
+      ids.length ? ids.forEach(id => add('Google Tag Manager', 'Tag Manager', id))
+                 : add('Google Tag Manager', 'Tag Manager', '');
+    } else if (Array.isArray(window.dataLayer)) {
+      add('Google Tag Manager', 'Tag Manager', '');
+    }
+
+    // ── Google Analytics 4 ──────────────────────────────────────
+    if (typeof window.gtag === 'function') {
+      let id = '';
+      if (Array.isArray(window.dataLayer)) {
+        for (const item of window.dataLayer) {
+          if (Array.isArray(item) && item[0] === 'config' && typeof item[1] === 'string' && item[1].startsWith('G-')) {
+            id = item[1]; break;
+          }
+        }
+      }
+      add('Google Analytics 4', 'Analytics', id);
+    }
+
+    // ── Google Analytics Universal ───────────────────────────────
+    if (typeof window.ga === 'function' || typeof window.GoogleAnalyticsObject !== 'undefined') {
+      let id = '';
+      try {
+        const obj = window.GoogleAnalyticsObject ? window[window.GoogleAnalyticsObject] : window.ga;
+        if (obj && obj.getAll) id = (obj.getAll()[0] || {get: () => ''}).get('trackingId') || '';
+      } catch (e) {}
+      add('Google Analytics Universal', 'Analytics', id);
+    }
+
+    // ── Google Ads ───────────────────────────────────────────────
+    if (typeof window.gtag === 'function' && Array.isArray(window.dataLayer)) {
+      for (const item of window.dataLayer) {
+        if (Array.isArray(item) && item[0] === 'config' && typeof item[1] === 'string' && item[1].startsWith('AW-')) {
+          add('Google Ads', 'Ads', item[1]); break;
+        }
+      }
+    }
+
+    // ── Facebook Pixel ───────────────────────────────────────────
+    if (typeof window.fbq === 'function') {
+      let id = '';
+      try {
+        if (window.fbq.getState) {
+          const pixels = window.fbq.getState().pixels;
+          if (pixels && pixels.length) id = String(pixels[0].id || '');
+        }
+      } catch (e) {}
+      add('Facebook Pixel', 'Ads', id);
+    }
+
+    // ── HotJar ───────────────────────────────────────────────────
+    if (typeof window.hj === 'function' || window.hjSiteSettings) {
+      const id = window.hjSiteSettings && window.hjSiteSettings.site_id
+        ? String(window.hjSiteSettings.site_id) : '';
+      add('HotJar', 'Heatmap', id);
+    }
+
+    // ── Microsoft Clarity ────────────────────────────────────────
+    if (typeof window.clarity === 'function') add('Microsoft Clarity', 'Heatmap', '');
+
+    // ── LinkedIn Insight ─────────────────────────────────────────
+    if (Array.isArray(window._linkedin_data_partner_ids) && window._linkedin_data_partner_ids.length) {
+      add('LinkedIn Insight', 'Ads', String(window._linkedin_data_partner_ids[0]));
+    } else if (typeof window._linkedin_partner_id !== 'undefined') {
+      add('LinkedIn Insight', 'Ads', String(window._linkedin_partner_id));
+    }
+
+    // ── TikTok Pixel ─────────────────────────────────────────────
+    if (typeof window.ttq !== 'undefined') add('TikTok Pixel', 'Ads', '');
+
+    // ── Twitter / X Pixel ────────────────────────────────────────
+    if (typeof window.twq === 'function') add('Twitter / X Pixel', 'Ads', '');
+
+    // ── Pinterest ────────────────────────────────────────────────
+    if (typeof window.pintrk === 'function') add('Pinterest Tag', 'Ads', '');
+
+    // ── Snapchat ─────────────────────────────────────────────────
+    if (typeof window.snaptr === 'function') add('Snapchat Pixel', 'Ads', '');
+
+    // ── HubSpot ──────────────────────────────────────────────────
+    if (window._hsq || window.HubSpotConversations || window.hsConversationsSettings)
+      add('HubSpot', 'CRM', '');
+
+    // ── Intercom ─────────────────────────────────────────────────
+    if (typeof window.Intercom === 'function') {
+      const id = window.intercomSettings && window.intercomSettings.app_id
+        ? window.intercomSettings.app_id : '';
+      add('Intercom', 'Chat', id);
+    }
+
+    // ── Crisp ────────────────────────────────────────────────────
+    if (window.$crisp)
+      add('Crisp Chat', 'Chat', window.CRISP_WEBSITE_ID || '');
+
+    // ── Drift ────────────────────────────────────────────────────
+    if (window.drift || window.driftt) add('Drift', 'Chat', '');
+
+    // ── Zendesk ──────────────────────────────────────────────────
+    if (window.zE || window.zEmbed) add('Zendesk', 'Chat', '');
+
+    // ── Segment ──────────────────────────────────────────────────
+    if (window.analytics && typeof window.analytics.track === 'function')
+      add('Segment', 'Analytics', '');
+
+    // ── Mixpanel ─────────────────────────────────────────────────
+    if (window.mixpanel && typeof window.mixpanel.track === 'function')
+      add('Mixpanel', 'Analytics', '');
+
+    // ── Amplitude ────────────────────────────────────────────────
+    if (window.amplitude && window.amplitude.getInstance)
+      add('Amplitude', 'Analytics', '');
+
+    // ── Klaviyo ──────────────────────────────────────────────────
+    if (window._learnq) add('Klaviyo', 'Email', '');
+
+    // ── ActiveCampaign ───────────────────────────────────────────
+    if (window.vgo || window.ac_cvs) add('ActiveCampaign', 'Email', '');
+
+    // ── RD Station ───────────────────────────────────────────────
+    if (window.RdIntegration || window.RD || window.rdstation)
+      add('RD Station', 'CRM', '');
+
+  } catch (e) {}
+
+  return tags;
+}
