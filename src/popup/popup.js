@@ -44,33 +44,42 @@ class PopupManager {
     document.getElementById('main').style.display = 'none';
     document.getElementById('error').style.display = 'none';
 
-    const tabs = await new Promise(r => chrome.tabs.query({ active: true, currentWindow: true }, r));
-    if (!tabs[0]) return this.showError('Aba nao encontrada.');
-    const tabId = tabs[0].id;
-
-    // DOM analysis — 4s timeout so popup never hangs indefinitely
-    const domData = await Promise.race([
-      new Promise(resolve => {
-        chrome.tabs.sendMessage(tabId, { type: 'REQUEST_ANALYSIS' }, response => {
-          if (chrome.runtime.lastError) resolve(null);
-          else resolve(response && response.data || null);
-        });
-      }),
-      new Promise(resolve => setTimeout(() => resolve(null), 4000))
-    ]);
-
-    if (!domData) {
-      const stored = await new Promise(r => chrome.storage.local.get('lastAnalysis', r));
-      if (stored.lastAnalysis) {
-        await this.enrichTagsViaScripting(stored.lastAnalysis, tabId);
-        return this.render(stored.lastAnalysis);
+    try {
+      const tabs = await new Promise(r => chrome.tabs.query({ active: true, currentWindow: true }, r));
+      if (!tabs[0]) {
+        this.showError('Aba nao encontrada.');
+        return;
       }
-      return this.showError('Recarregue a pagina (F5) e tente novamente.');
-    }
+      const tabId = tabs[0].id;
 
-    // JS-globals analysis — runs in the page's own JS context
-    await this.enrichTagsViaScripting(domData, tabId);
-    this.render(domData);
+      // DOM analysis — timeout ampla: análise pesada roda após microtask no content script
+      const domData = await Promise.race([
+        new Promise(resolve => {
+          chrome.tabs.sendMessage(tabId, { type: 'REQUEST_ANALYSIS' }, response => {
+            if (chrome.runtime.lastError) resolve(null);
+            else resolve(response && response.data || null);
+          });
+        }),
+        new Promise(resolve => setTimeout(() => resolve(null), 12000))
+      ]);
+
+      if (!domData) {
+        const stored = await new Promise(r => chrome.storage.local.get('lastAnalysis', r));
+        if (stored.lastAnalysis) {
+          await this.enrichTagsViaScripting(stored.lastAnalysis, tabId);
+          this.render(stored.lastAnalysis);
+          return;
+        }
+        this.showError('Recarregue a pagina (F5) e tente novamente.');
+        return;
+      }
+
+      await this.enrichTagsViaScripting(domData, tabId);
+      this.render(domData);
+    } catch (e) {
+      console.error('[SEO Analyzer popup]', e);
+      this.showError('Erro ao processar a analise. Recarregue a pagina e tente de novo.');
+    }
   }
 
   async enrichTagsViaScripting(data, tabId) {

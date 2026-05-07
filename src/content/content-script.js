@@ -271,7 +271,7 @@ const SEOAnalyzer = {
     const STOP = new Set(['de','a','o','que','e','do','da','em','um','para','com','uma','os','no','se','na','por','mais','as','dos','como','mas','ao','ele','das','seu','sua','ou','ser','quando','muito','nos','já','também','pelo','pela','até','isso','ela','entre','era','depois','sem','mesmo','aos','seus','nas','me','esse','eles','você','essa','nem','suas','meu','minha','pelos','elas','seja','qual','será','nós','lhe','essas','esses','pelas','este','dele','tu','te','vocês','foi','são','está','tem','não','num','nessa','neste','nesta','nesse','ter','sobre','aqui','ali','tudo','cada','onde','the','and','or','but','in','on','at','to','for','of','with','by','from','is','are','was','were','be','been','have','has','had','do','does','did','will','would','could','should','may','might','this','that','these','those','it','its','not','no','so','if','as','up','out','about','into','than','then','there','when','where','who','which','what','how','all','each','they','them','their','we','our','you','your','he','she','his','her','can','just','an','also','been','being']);
 
     // Single innerText call — reuse for both word count and keywords
-    const bodyText = document.body.innerText || '';
+    const bodyText = (document.body && document.body.innerText) || '';
     const allWords = bodyText.trim().split(/\s+/);
 
     // textContent on specific elements is faster (no layout forced)
@@ -390,6 +390,22 @@ if (document.readyState === 'loading') {
   SEOAnalyzer.sendToBackground(_analysisCache);
 }
 
+// Resposta assíncrona: análise do DOM é pesada; no MV3 uma pilha síncrona longa antes de
+// sendResponse pode fazer o canal cair e o popup ficar em "Analisando..." para sempre.
 chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
-  if (req.type === 'REQUEST_ANALYSIS') sendResponse({ success: true, data: getAnalysis() });
+  if (req.type !== 'REQUEST_ANALYSIS') return;
+
+  const reply = () => {
+    try {
+      _analysisCache = null;
+      const data = getAnalysis();
+      sendResponse({ success: true, data });
+    } catch (e) {
+      sendResponse({ success: false, data: null });
+    }
+  };
+
+  if (typeof queueMicrotask === 'function') queueMicrotask(reply);
+  else setTimeout(reply, 0);
+  return true;
 });
