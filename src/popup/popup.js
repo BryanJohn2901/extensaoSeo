@@ -48,13 +48,16 @@ class PopupManager {
     if (!tabs[0]) return this.showError('Aba nao encontrada.');
     const tabId = tabs[0].id;
 
-    // DOM analysis (meta, headings, links, keywords, etc.)
-    const domData = await new Promise(resolve => {
-      chrome.tabs.sendMessage(tabId, { type: 'REQUEST_ANALYSIS' }, response => {
-        if (chrome.runtime.lastError) resolve(null);
-        else resolve(response && response.data || null);
-      });
-    });
+    // DOM analysis — 4s timeout so popup never hangs indefinitely
+    const domData = await Promise.race([
+      new Promise(resolve => {
+        chrome.tabs.sendMessage(tabId, { type: 'REQUEST_ANALYSIS' }, response => {
+          if (chrome.runtime.lastError) resolve(null);
+          else resolve(response && response.data || null);
+        });
+      }),
+      new Promise(resolve => setTimeout(() => resolve(null), 4000))
+    ]);
 
     if (!domData) {
       const stored = await new Promise(r => chrome.storage.local.get('lastAnalysis', r));
@@ -72,15 +75,18 @@ class PopupManager {
 
   async enrichTagsViaScripting(data, tabId) {
     try {
-      const results = await new Promise(resolve => {
-        chrome.scripting.executeScript(
-          { target: { tabId }, world: 'MAIN', func: detectTagsInPageContext },
-          res => {
-            if (chrome.runtime.lastError) resolve([]);
-            else resolve(res);
-          }
-        );
-      });
+      const results = await Promise.race([
+        new Promise(resolve => {
+          chrome.scripting.executeScript(
+            { target: { tabId }, world: 'MAIN', func: detectTagsInPageContext },
+            res => {
+              if (chrome.runtime.lastError) resolve([]);
+              else resolve(res);
+            }
+          );
+        }),
+        new Promise(resolve => setTimeout(() => resolve([]), 1500))
+      ]);
       const jsTags = results && results[0] && results[0].result || [];
       data.tags = this.mergeTags(data.tags || [], jsTags);
     } catch (e) {

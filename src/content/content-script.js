@@ -217,23 +217,13 @@ const SEOAnalyzer = {
       if (POOR_ANCHORS.test(a.textContent.trim())) poorAnchors++;
     });
 
-    const bodyText = document.body.innerText || '';
-    const bodyHTML = document.body.innerHTML || '';
-    const textRatio = bodyHTML.length > 0 ? Math.round(bodyText.length / bodyHTML.length * 100) : 0;
-
-    // Publication date
     let publishDate = '';
     for (const sel of ['meta[property="article:published_time"]','meta[name="date"]','time[datetime]','meta[property="og:updated_time"]']) {
       const el = document.querySelector(sel);
       if (el) { publishDate = el.getAttribute('content') || el.getAttribute('datetime') || ''; if (publishDate) break; }
     }
 
-    return {
-      poorAnchorTexts: poorAnchors,
-      textToHtmlRatio: textRatio,
-      publishDate,
-      hasDateMarkup:   !!publishDate,
-    };
+    return { poorAnchorTexts: poorAnchors, publishDate, hasDateMarkup: !!publishDate };
   },
 
   // ── LINKS ────────────────────────────────────────────────────
@@ -243,7 +233,9 @@ const SEOAnalyzer = {
     const currentDomain = new URL(window.location.href).hostname;
     const extDomains = {};
 
-    document.querySelectorAll('a[href]').forEach(link => {
+    // Cap at 300 to avoid slow scan on link-heavy pages
+    const links = Array.from(document.querySelectorAll('a[href]')).slice(0, 300);
+    links.forEach(link => {
       const href = link.getAttribute('href') || '';
       if (!href || /^(#|mailto:|tel:|javascript:)/.test(href)) return;
       if (href.startsWith('http') || href.startsWith('//')) {
@@ -278,12 +270,16 @@ const SEOAnalyzer = {
   analyzeContent() {
     const STOP = new Set(['de','a','o','que','e','do','da','em','um','para','com','uma','os','no','se','na','por','mais','as','dos','como','mas','ao','ele','das','seu','sua','ou','ser','quando','muito','nos','já','também','pelo','pela','até','isso','ela','entre','era','depois','sem','mesmo','aos','seus','nas','me','esse','eles','você','essa','nem','suas','meu','minha','pelos','elas','seja','qual','será','nós','lhe','essas','esses','pelas','este','dele','tu','te','vocês','foi','são','está','tem','não','num','nessa','neste','nesta','nesse','ter','sobre','aqui','ali','tudo','cada','onde','the','and','or','but','in','on','at','to','for','of','with','by','from','is','are','was','were','be','been','have','has','had','do','does','did','will','would','could','should','may','might','this','that','these','those','it','its','not','no','so','if','as','up','out','about','into','than','then','there','when','where','who','which','what','how','all','each','they','them','their','we','our','you','your','he','she','his','her','can','just','an','also','been','being']);
 
-    let ct = '';
-    document.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,td,th').forEach(el => { ct += ' ' + el.innerText; });
-    if (!ct.trim()) ct = document.body.innerText;
+    // Single innerText call — reuse for both word count and keywords
+    const bodyText = document.body.innerText || '';
+    const allWords = bodyText.trim().split(/\s+/);
 
-    const allWords = document.body.innerText.trim().split(/\s+/);
-    const cleaned  = ct.toLowerCase().replace(/[^a-záàâãéèêíïóôõöúüçñ\s]/gi, ' ').split(/\s+/).filter(w => w.length > 3 && !STOP.has(w) && !/^\d+$/.test(w));
+    // textContent on specific elements is faster (no layout forced)
+    let ct = '';
+    document.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,td,th').forEach(el => { ct += ' ' + el.textContent; });
+    if (!ct.trim()) ct = bodyText;
+
+    const cleaned = ct.toLowerCase().replace(/[^a-záàâãéèêíïóôõöúüçñ\s]/gi, ' ').split(/\s+/).filter(w => w.length > 3 && !STOP.has(w) && !/^\d+$/.test(w));
 
     const freq = {};
     cleaned.forEach(w => { freq[w] = (freq[w] || 0) + 1; });
@@ -364,7 +360,6 @@ const SEOAnalyzer = {
         performance:    this.analyzePerformance(),
         contentQuality: this.analyzeContentQuality(),
         tags:           this.analyzeTags(),
-        webhooks:       this.detectWebhooks(),
       };
     } catch (err) {
       console.error('SEO Analyzer error:', err);
@@ -372,15 +367,29 @@ const SEOAnalyzer = {
     }
   },
 
-  sendToBackground() {
-    const data = this.runFullAnalysis();
+  sendToBackground(data) {
     if (data) chrome.runtime.sendMessage({ type: 'SEO_ANALYSIS_COMPLETE', data }, () => { if (chrome.runtime.lastError) {} });
   }
 };
 
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => SEOAnalyzer.sendToBackground());
-else SEOAnalyzer.sendToBackground();
+// Cache result so popup requests return instantly without re-running analysis
+let _analysisCache = null;
+
+function getAnalysis() {
+  if (!_analysisCache) _analysisCache = SEOAnalyzer.runFullAnalysis();
+  return _analysisCache;
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    _analysisCache = SEOAnalyzer.runFullAnalysis();
+    SEOAnalyzer.sendToBackground(_analysisCache);
+  });
+} else {
+  _analysisCache = SEOAnalyzer.runFullAnalysis();
+  SEOAnalyzer.sendToBackground(_analysisCache);
+}
 
 chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
-  if (req.type === 'REQUEST_ANALYSIS') sendResponse({ success: true, data: SEOAnalyzer.runFullAnalysis() });
+  if (req.type === 'REQUEST_ANALYSIS') sendResponse({ success: true, data: getAnalysis() });
 });
