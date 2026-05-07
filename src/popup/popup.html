@@ -256,12 +256,29 @@
 
         <!-- FOOTER -->
         <div class="popup-footer">
+            <button id="promptBtn" class="btn btn-primary">Gerar Prompt para IA</button>
             <button id="exportBtn" class="btn btn-secondary">Exportar JSON</button>
         </div>
 
     </div><!-- /main -->
 
 </div>
+
+<!-- PROMPT MODAL -->
+<div id="promptModal" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+        <div class="modal-header">
+            <span class="modal-title">Prompt para IA</span>
+            <button id="modalClose" class="icon-btn modal-close-btn" title="Fechar">&#x2715;</button>
+        </div>
+        <p class="modal-sub">Copie e cole em qualquer IA (ChatGPT, Claude, Gemini...)</p>
+        <textarea id="promptText" class="prompt-textarea" readonly></textarea>
+        <div class="modal-actions">
+            <button id="copyPromptBtn" class="btn btn-primary">Copiar Prompt</button>
+        </div>
+    </div>
+</div>
+
 <script src="../../dist/popup.js"></script>
 </body>
 </html>

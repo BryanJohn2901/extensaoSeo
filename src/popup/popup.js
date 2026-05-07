@@ -8,6 +8,10 @@ class PopupManager {
     document.getElementById('reloadBtn').addEventListener('click', () => this.requestAnalysis());
     document.getElementById('exportBtn').addEventListener('click', () => this.exportJSON());
     document.getElementById('retryBtn').addEventListener('click', () => this.requestAnalysis());
+    document.getElementById('promptBtn').addEventListener('click', () => this.openPromptModal());
+    document.getElementById('modalClose').addEventListener('click', () => this.closePromptModal());
+    document.getElementById('copyPromptBtn').addEventListener('click', () => this.copyPrompt());
+    document.getElementById('promptModal').addEventListener('click', e => { if (e.target === e.currentTarget) this.closePromptModal(); });
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
     });
@@ -823,6 +827,105 @@ class PopupManager {
     a.download = 'seo-analysis-' + Date.now() + '.json';
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  // ─── AI PROMPT ───────────────────────────────────────────────
+
+  openPromptModal() {
+    if (!this.data) return;
+    document.getElementById('promptText').value = this.generateAIPrompt();
+    document.getElementById('promptModal').style.display = 'flex';
+  }
+
+  closePromptModal() {
+    document.getElementById('promptModal').style.display = 'none';
+    const btn = document.getElementById('copyPromptBtn');
+    btn.textContent = 'Copiar Prompt';
+    btn.className = 'btn btn-primary';
+  }
+
+  copyPrompt() {
+    const text = document.getElementById('promptText').value;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copyPromptBtn');
+      btn.textContent = 'Copiado!';
+      btn.className = 'btn btn-copied';
+      setTimeout(() => {
+        btn.textContent = 'Copiar Prompt';
+        btn.className = 'btn btn-primary';
+      }, 2000);
+    });
+  }
+
+  generateAIPrompt() {
+    const d    = this.data;
+    const meta = d.meta || {};
+    const img  = d.images || {};
+    const h    = d.headings || {};
+    const h1   = (h.distribution && h.distribution.h1) || 0;
+    const kw   = d.keywords || {};
+    const url  = d.url_analysis || {};
+    const perf = d.performance || {};
+    const og   = meta.og || {};
+    const score = this.calcScore();
+    const actions = this.buildActionPlan();
+    const isHTTPS = url.isHTTPS || (d.technical && d.technical.isHTTPS);
+    const isMobile = meta.hasViewport || (d.technical && d.technical.mobile);
+
+    const criticos    = actions.filter(a => a.p === 'critico');
+    const importantes = actions.filter(a => a.p === 'importante');
+    const recomendados = actions.filter(a => a.p === 'recomendado');
+
+    const line = (label, value) => `- ${label}: ${value}`;
+    const list = (arr, icon) => arr.length ? arr.map((a, i) => `${icon} ${i + 1}. ${a.text}`).join('\n') : '  Nenhum';
+
+    const tags = (d.tags || []).map(t => t.name + (t.id ? ` (${t.id})` : '')).join(', ') || 'Nenhuma detectada';
+
+    const headingH1 = h.h1Texts && h.h1Texts[0] ? `"${h.h1Texts[0]}"` : '(ausente)';
+    const schemaTypes = (meta.schemaTypes || []).join(', ') || 'Nenhum';
+
+    return `Sou responsavel pelo site abaixo e preciso de ajuda para corrigir os problemas de SEO identificados por uma ferramenta de analise. Por favor, me forneça solucoes praticas com o codigo HTML exato para cada correcao.
+
+## Dados da Pagina Analisada
+
+${line('URL', d.url || '(nao identificada)')}
+${line('Score SEO atual', score + '/10')}
+${line('Title', meta.title ? `"${meta.title}" (${meta.titleLength} chars)` : 'AUSENTE')}
+${line('Meta Description', meta.description ? `"${meta.description.substring(0, 100)}..." (${meta.descriptionLength} chars)` : 'AUSENTE')}
+${line('Canonical', meta.canonical || 'AUSENTE')}
+${line('Robots', meta.robots || 'nao definido')}
+${line('H1', h1 === 0 ? 'AUSENTE' : h1 === 1 ? headingH1 : h1 + ' H1s: ' + (h.h1Texts || []).join(' | '))}
+${line('H2s', (h.distribution && h.distribution.h2) || 0)}
+${line('HTTPS', isHTTPS ? 'Sim' : 'NAO')}
+${line('Mobile Viewport', isMobile ? 'Sim' : 'NAO')}
+${line('Open Graph', (og.score || 0) + '/4 tags (title, description, image, url)')}
+${line('Twitter Card', (meta.tw && meta.tw.card) ? meta.tw.card : 'AUSENTE')}
+${line('Dados Estruturados (Schema)', schemaTypes)}
+${line('Imagens', img.total || 0)}
+${line('  - Alt text', (img.altCoverage || 0) + '% de cobertura')}
+${line('  - Lazy loading', (img.lazyCoverage || 0) + '% de cobertura')}
+${line('  - Formato WebP', (img.webpCoverage || 0) + '% de cobertura')}
+${line('Scripts bloqueantes', perf.scriptsBlocking || 0)}
+${line('Volume de conteudo', (kw.wordCount || 0) + ' palavras')}
+${line('Tags/Pixels detectados', tags)}
+
+## Problemas Identificados
+
+${criticos.length ? '### CRITICOS (impacto direto no ranqueamento)\n' + list(criticos, '🔴') : ''}
+
+${importantes.length ? '### IMPORTANTES (melhoram significativamente o SEO)\n' + list(importantes, '🟡') : ''}
+
+${recomendados.length ? '### RECOMENDADOS (boas praticas)\n' + list(recomendados, '🟢') : ''}
+
+## O Que Preciso
+
+Para cada problema acima, por favor:
+1. Explique em 1 linha por que isso afeta o SEO
+2. Forneça o codigo HTML/meta tag exato para corrigir, adaptado ao contexto do meu site
+3. Se aplicavel, mostre um exemplo antes e depois
+
+Comece pelos problemas CRITICOS e siga a ordem de prioridade.
+Se precisar de mais contexto sobre o site para personalizar as sugestoes, pergunte.`.trim();
   }
 
   showError(msg) {
