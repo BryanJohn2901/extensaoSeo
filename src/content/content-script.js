@@ -490,23 +490,142 @@ const SEOAnalyzer = {
     return items;
   },
 
+  // ── PERFORMANCE TIMING ───────────────────────────────────────
+  analyzePerformanceTiming() {
+    try {
+      const entries = performance.getEntriesByType('navigation');
+      const nav = (entries && entries[0]) || {};
+      const resources = performance.getEntriesByType('resource') || [];
+      const totalTransfer = resources.reduce((s, r) => s + (r.transferSize || 0), 0);
+      return {
+        ttfb: nav.responseStart ? Math.round(nav.responseStart - nav.requestStart) : null,
+        domContentLoaded: nav.domContentLoadedEventEnd ? Math.round(nav.domContentLoadedEventEnd) : null,
+        loadComplete: nav.loadEventEnd ? Math.round(nav.loadEventEnd) : null,
+        domNodes: document.querySelectorAll('*').length,
+        resourceCount: resources.length,
+        totalTransferKB: totalTransfer > 0 ? Math.round(totalTransfer / 1024) : null,
+      };
+    } catch (e) { return {}; }
+  },
+
+  // ── READABILITY ──────────────────────────────────────────────
+  analyzeReadability() {
+    try {
+      let text = '';
+      document.querySelectorAll('p').forEach(el => { text += ' ' + (el.innerText || ''); });
+      if (text.trim().length < 100) text = (document.body && document.body.innerText) || '';
+      if (!text.trim()) return {};
+      const sentences = (text.match(/[^.!?]+[.!?]+/g) || []).filter(s => s.trim().length > 10);
+      const words = text.trim().split(/\s+/).filter(w => w.length > 1);
+      if (sentences.length === 0 || words.length < 30) return {};
+      const avgWords = Math.round(words.length / sentences.length);
+      const flesch = Math.max(0, Math.min(100, Math.round(206.835 - 1.015 * avgWords)));
+      return {
+        avgWordsPerSentence: avgWords,
+        fleschScore: flesch,
+        level: flesch >= 70 ? 'Fácil' : flesch >= 50 ? 'Médio' : 'Difícil',
+        sentences: sentences.length,
+      };
+    } catch (e) { return {}; }
+  },
+
+  // ── PAGE STRUCTURE ───────────────────────────────────────────
+  analyzePageStructure() {
+    try {
+      const feeds = Array.from(document.querySelectorAll('link[type="application/rss+xml"], link[type="application/atom+xml"]'))
+        .map(l => ({ title: l.getAttribute('title') || 'Feed', href: l.getAttribute('href') || '' }));
+      const prevPage = document.querySelector('link[rel="prev"]');
+      const nextPage = document.querySelector('link[rel="next"]');
+
+      const jsonLds = Array.from(document.querySelectorAll('script[type="application/ld+json"]'));
+      const allLD = jsonLds.map(s => { try { return JSON.parse(s.textContent); } catch(e) { return null; } }).filter(Boolean);
+      const hasType = t => allLD.some(d =>
+        d['@type'] === t ||
+        (Array.isArray(d['@type']) && d['@type'].includes(t)) ||
+        (d['@graph'] && d['@graph'].some(g => g['@type'] === t))
+      );
+
+      const ogImage = document.querySelector('meta[property="og:image"]');
+      const ogImageUrl = ogImage ? ogImage.getAttribute('content') : '';
+      const ogImageDims = ogImageUrl ? (() => {
+        const m = ogImageUrl.match(/(\d{3,4})[x×](\d{3,4})/);
+        return m ? { w: parseInt(m[1]), h: parseInt(m[2]) } : null;
+      })() : null;
+
+      return {
+        feeds,
+        hasRSS: feeds.length > 0,
+        hasPrev: !!prevPage,
+        hasNext: !!nextPage,
+        prevHref: prevPage ? (prevPage.getAttribute('href') || '') : '',
+        nextHref: nextPage ? (nextPage.getAttribute('href') || '') : '',
+        hasBreadcrumb: hasType('BreadcrumbList'),
+        hasFAQ: hasType('FAQPage'),
+        hasArticle: hasType('Article') || hasType('BlogPosting') || hasType('NewsArticle'),
+        hasProduct: hasType('Product'),
+        hasLocalBusiness: hasType('LocalBusiness'),
+        hasOrganization: hasType('Organization'),
+        hasHowTo: hasType('HowTo'),
+        hasEvent: hasType('Event'),
+        ogImageDims,
+      };
+    } catch (e) { return {}; }
+  },
+
+  // ── KEYWORD PROMINENCE ───────────────────────────────────────
+  analyzeKeywordProminence() {
+    try {
+      const title = document.title || '';
+      const metaDesc = document.querySelector('meta[name="description"]');
+      const desc = metaDesc ? (metaDesc.getAttribute('content') || '') : '';
+      const h1s = Array.from(document.querySelectorAll('h1')).map(h => h.innerText.trim());
+      const h1Text = h1s.join(' ').toLowerCase();
+      const h2s = Array.from(document.querySelectorAll('h2')).slice(0, 5).map(h => h.innerText.trim().toLowerCase());
+
+      const STOP = new Set(['de','a','o','que','e','do','da','em','um','para','com','uma','os','no','se','na','por','mais','as','dos','como','mas','ao','ele','das','seu','sua','ou','ser','the','and','or','but','in','on','at','to','for','of','with','by','is','are','was','were','not','this','that','it','its','you','we','they']);
+      let bodyText = '';
+      document.querySelectorAll('h1,h2,h3,p,li').forEach(el => { bodyText += ' ' + (el.textContent || ''); });
+      const words = bodyText.toLowerCase().replace(/[^a-záàâãéèêíïóôõöúüçñ\s]/gi, ' ').split(/\s+/).filter(w => w.length > 4 && !STOP.has(w) && !/^\d+$/.test(w));
+      const freq = {};
+      words.forEach(w => { freq[w] = (freq[w] || 0) + 1; });
+      const top3 = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([w]) => w);
+      const mainKeyword = top3[0] || '';
+
+      if (!mainKeyword) return {};
+
+      return {
+        mainKeyword,
+        top3Keywords: top3,
+        keywordInTitle: title.toLowerCase().includes(mainKeyword),
+        keywordInDesc: desc.toLowerCase().includes(mainKeyword),
+        keywordInH1: h1Text.includes(mainKeyword),
+        keywordInH2: h2s.some(h => h.includes(mainKeyword)),
+        keywordDensity: words.length > 0 ? +(( freq[mainKeyword] / words.length) * 100).toFixed(1) : 0,
+      };
+    } catch (e) { return {}; }
+  },
+
   // ── FULL ANALYSIS ────────────────────────────────────────────
   runFullAnalysis() {
     try {
       return {
-        url:            window.location.href,
-        timestamp:      new Date().toISOString(),
-        meta:           this.analyzeMeta(),
-        headings:       this.analyzeHeadings(),
-        images:         this.analyzeImages(),
-        links:          this.analyzeLinks(),
-        keywords:       this.analyzeContent(),
-        url_analysis:   this.analyzeURL(),
-        performance:    this.analyzePerformance(),
-        contentQuality: this.analyzeContentQuality(),
-        tags:           this.analyzeTags(),
-        webhooks:       this.detectWebhooks(),
-        technologies:   this.analyzeTechnologies(),
+        url:              window.location.href,
+        timestamp:        new Date().toISOString(),
+        meta:             this.analyzeMeta(),
+        headings:         this.analyzeHeadings(),
+        images:           this.analyzeImages(),
+        links:            this.analyzeLinks(),
+        keywords:         this.analyzeContent(),
+        url_analysis:     this.analyzeURL(),
+        performance:      this.analyzePerformance(),
+        timing:           this.analyzePerformanceTiming(),
+        readability:      this.analyzeReadability(),
+        pageStructure:    this.analyzePageStructure(),
+        keywordProminence: this.analyzeKeywordProminence(),
+        contentQuality:   this.analyzeContentQuality(),
+        tags:             this.analyzeTags(),
+        webhooks:         this.detectWebhooks(),
+        technologies:     this.analyzeTechnologies(),
         technical: {
           mobile: !!document.querySelector('meta[name="viewport"]'),
           isHTTPS: window.location.protocol === 'https:',

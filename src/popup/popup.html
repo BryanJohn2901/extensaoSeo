@@ -51,7 +51,9 @@
             <button class="tab" data-tab="tech" title="Tecnologias detectadas na pagina">
                 Tech <span id="badge-tech" class="tab-badge"></span>
             </button>
-            <button class="tab" data-tab="content">Conteudo</button>
+            <button class="tab" data-tab="content">
+                Conteudo <span id="badge-content" class="tab-badge"></span>
+            </button>
             <button class="tab" data-tab="plan">
                 Plano <span id="badge-plan" class="tab-badge"></span>
             </button>
@@ -79,6 +81,12 @@
                         <p id="scoreMsg" class="score-msg"></p>
                         <div class="score-bar"><div id="scoreFill" class="score-fill"></div></div>
                     </div>
+                </div>
+
+                <!-- SERP Preview -->
+                <div class="card">
+                    <h3 class="card-title">Preview no Google (SERP)</h3>
+                    <div id="serpPreview"></div>
                 </div>
 
                 <!-- Meta Tags -->
@@ -118,6 +126,18 @@
                     </div>
                 </div>
 
+                <!-- Social Preview -->
+                <div class="card">
+                    <h3 class="card-title">Preview Social (og:image)</h3>
+                    <div id="socialPreviewCard"></div>
+                </div>
+
+                <!-- Keyword Prominence -->
+                <div class="card">
+                    <h3 class="card-title">Proeminencia de Palavras-Chave</h3>
+                    <div id="keywordProminenceCard"></div>
+                </div>
+
                 <!-- Headings -->
                 <div class="card">
                     <h3 class="card-title">Estrutura de Headings</h3>
@@ -144,10 +164,22 @@
                     <div id="perfStats"></div>
                 </div>
 
+                <!-- Core Web Vitals / Timing -->
+                <div class="card">
+                    <h3 class="card-title">Timing da Pagina</h3>
+                    <div id="timingStats"></div>
+                </div>
+
                 <!-- Structured Data -->
                 <div class="card" id="schemaCard">
                     <h3 class="card-title">Dados Estruturados (Schema)</h3>
                     <div id="schemaInfo"></div>
+                </div>
+
+                <!-- Page Structure -->
+                <div class="card">
+                    <h3 class="card-title">Estrutura da Pagina</h3>
+                    <div id="pageStructureCard"></div>
                 </div>
 
                 <!-- Checks -->
@@ -236,6 +268,11 @@
                             <span class="stat-lbl">Paragrafos</span>
                         </div>
                     </div>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">Legibilidade</h3>
+                    <p class="card-sub">Score Flesch (0=muito dificil, 100=muito facil)</p>
+                    <div id="readabilityStats"></div>
                 </div>
                 <div class="card">
                     <h3 class="card-title">Palavras-chave da Pagina</h3>

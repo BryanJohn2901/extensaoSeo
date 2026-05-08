@@ -176,14 +176,191 @@ class PopupManager {
     document.getElementById('scoreFill').className = 'score-fill ' + cls;
     document.getElementById('scoreMsg').textContent = this.scoreLabel(score);
 
+    this.renderSERPPreview();
     this.renderMetaTags();
     this.renderOG();
+    this.renderSocialPreview();
+    this.renderKeywordProminence();
     this.renderHeadings();
     this.renderImagesSection();
     this.renderURLSection();
     this.renderPerfSection();
+    this.renderTimingStats();
     this.renderSchema();
+    this.renderPageStructure();
     this.renderChecks();
+  }
+
+  // ── SERP Preview ─────────────────────────────────────────────
+
+  renderSERPPreview() {
+    const el = document.getElementById('serpPreview');
+    if (!el) return;
+    const meta = this.data.meta || {};
+    const url = this.data.url || '';
+
+    let displayUrl = '';
+    try {
+      const u = new URL(url);
+      const parts = [u.hostname.replace('www.', '')];
+      if (u.pathname && u.pathname !== '/') {
+        parts.push(...u.pathname.split('/').filter(Boolean).slice(0, 3));
+      }
+      displayUrl = parts.join(' › ');
+    } catch (e) { displayUrl = url.substring(0, 80); }
+
+    const title = meta.title || '';
+    const desc  = meta.description || '';
+    const tLen  = meta.titleLength || title.length;
+    const dLen  = meta.descriptionLength || desc.length;
+
+    const titleDisplay = title ? (tLen > 60 ? title.slice(0, 57) + '...' : title) : '(Sem title tag)';
+    const descDisplay  = desc  ? (dLen > 160 ? desc.slice(0, 157) + '...' : desc)  : '(Sem meta description — o Google pode gerar automaticamente)';
+
+    const tCls = !title ? 'char-bad' : meta.titleOptimal ? 'char-ok' : 'char-warn';
+    const dCls = !desc  ? 'char-bad' : meta.descriptionOptimal ? 'char-ok' : 'char-warn';
+
+    el.innerHTML =
+      '<div class="serp-box">' +
+        '<div class="serp-url">' + this.escapeHtml(displayUrl) + '</div>' +
+        '<div class="serp-title' + (!title ? ' truncated' : tLen > 60 ? ' truncated' : '') + '">' + this.escapeHtml(titleDisplay) + '</div>' +
+        '<div class="serp-desc' + (!desc ? ' absent' : '') + '">' + this.escapeHtml(descDisplay) + '</div>' +
+      '</div>' +
+      '<div class="serp-chars">' +
+        '<span class="serp-char-item ' + tCls + '">Title: ' + tLen + ' chars (max 60)</span>' +
+        '<span class="serp-char-item ' + dCls + '">Descricao: ' + dLen + ' chars (max 160)</span>' +
+      '</div>';
+  }
+
+  // ── Social Preview ───────────────────────────────────────────
+
+  renderSocialPreview() {
+    const el = document.getElementById('socialPreviewCard');
+    if (!el) return;
+    const meta = this.data.meta || {};
+    const og   = meta.og || {};
+
+    const title  = og.title || meta.title || '';
+    const desc   = og.description || meta.description || '';
+    const image  = og.image || '';
+    let domain = '';
+    try { domain = new URL(this.data.url || '').hostname.replace('www.', '').toUpperCase(); } catch(e) {}
+
+    const imgHtml = image
+      ? '<div class="social-img-wrap"><img src="' + this.escapeHtml(image) + '" class="social-img" onerror="this.parentElement.innerHTML=\'<div style=&quot;padding:14px;font-size:11px;color:#94a3b8;text-align:center&quot;>Imagem nao carregada</div>\'"/></div>'
+      : '<div class="social-img-placeholder"><span>og:image ausente — sem preview visual</span></div>';
+
+    el.innerHTML =
+      '<div class="social-preview">' +
+        imgHtml +
+        '<div class="social-info">' +
+          '<span class="social-domain">' + this.escapeHtml(domain) + '</span>' +
+          '<p class="social-title">' + this.escapeHtml(this.safeSlice(title || '(sem titulo)', 70)) + '</p>' +
+          '<p class="social-desc' + (!desc ? ' absent' : '') + '">' + this.escapeHtml(this.safeSlice(desc || '(sem og:description)', 120)) + '</p>' +
+        '</div>' +
+      '</div>' +
+      '<p class="card-sub" style="margin-top:8px;margin-bottom:0">Previa aproximada: Facebook · LinkedIn · WhatsApp</p>';
+  }
+
+  // ── Keyword Prominence ───────────────────────────────────────
+
+  renderKeywordProminence() {
+    const el = document.getElementById('keywordProminenceCard');
+    if (!el) return;
+    const kp = this.data.keywordProminence || {};
+
+    if (!kp.mainKeyword) {
+      el.innerHTML = '<p class="empty-msg">Conteudo insuficiente para analise.</p>';
+      return;
+    }
+
+    const cell = (label, present) =>
+      '<div class="kp-cell">' +
+        '<span class="kp-icon">' + (present ? '✅' : '❌') + '</span>' +
+        '<span class="kp-lbl">' + label + '</span>' +
+      '</div>';
+
+    el.innerHTML =
+      '<p style="font-size:11px;color:var(--text-3);margin-bottom:8px">Palavra-chave principal detectada: <strong style="color:var(--accent-text)">"' + this.escapeHtml(kp.mainKeyword) + '"</strong></p>' +
+      '<div class="kp-grid">' +
+        cell('No Title', kp.keywordInTitle) +
+        cell('Na Description', kp.keywordInDesc) +
+        cell('No H1', kp.keywordInH1) +
+        cell('No H2', kp.keywordInH2) +
+      '</div>' +
+      '<div class="url-row" style="border-top:1px solid var(--border-light);padding-top:8px">' +
+        '<span class="url-lbl">Densidade no conteudo</span>' +
+        '<span class="url-val ' + (kp.keywordDensity >= 0.5 && kp.keywordDensity <= 3 ? 'val-ok' : 'val-warn') + '">' + kp.keywordDensity + '%</span>' +
+      '</div>' +
+      (kp.top3Keywords && kp.top3Keywords.length > 1
+        ? '<p style="font-size:10.5px;color:var(--text-3);margin-top:8px">Top termos: ' + kp.top3Keywords.map(w => '<strong>' + this.escapeHtml(w) + '</strong>').join(' · ') + '</p>'
+        : '');
+  }
+
+  // ── Timing Stats ─────────────────────────────────────────────
+
+  renderTimingStats() {
+    const el = document.getElementById('timingStats');
+    if (!el) return;
+    const t = this.data.timing || {};
+
+    if (!t.loadComplete && !t.domContentLoaded && !t.ttfb) {
+      el.innerHTML = '<p class="empty-msg">Dados de timing nao disponiveis nesta pagina.</p>';
+      return;
+    }
+
+    const tClass = (ms, good, bad) => ms == null ? '' : ms <= good ? 't-ok' : ms <= bad ? 't-warn' : 't-bad';
+
+    let grid = '<div class="timing-grid">';
+    if (t.ttfb != null) {
+      grid += '<div class="timing-box"><span class="timing-val ' + tClass(t.ttfb, 200, 600) + '">' + t.ttfb + '<small style="font-size:11px">ms</small></span><span class="timing-lbl">TTFB</span></div>';
+    }
+    if (t.domContentLoaded) {
+      grid += '<div class="timing-box"><span class="timing-val ' + tClass(t.domContentLoaded, 2000, 4000) + '">' + (t.domContentLoaded >= 1000 ? (t.domContentLoaded/1000).toFixed(1) + 's' : t.domContentLoaded + 'ms') + '</span><span class="timing-lbl">DOM Loaded</span></div>';
+    }
+    if (t.loadComplete) {
+      grid += '<div class="timing-box"><span class="timing-val ' + tClass(t.loadComplete, 3000, 6000) + '">' + (t.loadComplete >= 1000 ? (t.loadComplete/1000).toFixed(1) + 's' : t.loadComplete + 'ms') + '</span><span class="timing-lbl">Load Complete</span></div>';
+    }
+    if (t.domNodes) {
+      grid += '<div class="timing-box"><span class="timing-val ' + tClass(t.domNodes, 1500, 3000) + '">' + t.domNodes + '</span><span class="timing-lbl">Nos DOM</span></div>';
+    }
+    if (t.resourceCount) {
+      grid += '<div class="timing-box"><span class="timing-val ' + tClass(t.resourceCount, 50, 100) + '">' + t.resourceCount + '</span><span class="timing-lbl">Recursos</span></div>';
+    }
+    if (t.totalTransferKB) {
+      grid += '<div class="timing-box"><span class="timing-val ' + tClass(t.totalTransferKB, 500, 1500) + '">' + t.totalTransferKB + '<small style="font-size:11px">KB</small></span><span class="timing-lbl">Transferido</span></div>';
+    }
+    grid += '</div>';
+    grid += '<p style="font-size:10px;color:var(--text-3)">TTFB &lt; 200ms · DOM &lt; 2s · Load &lt; 3s = verde</p>';
+    el.innerHTML = grid;
+  }
+
+  // ── Page Structure ───────────────────────────────────────────
+
+  renderPageStructure() {
+    const el = document.getElementById('pageStructureCard');
+    if (!el) return;
+    const ps = this.data.pageStructure || {};
+
+    const row = (label, value, cls) =>
+      '<div class="struct-row">' +
+        '<span class="struct-lbl">' + label + '</span>' +
+        '<span class="struct-badge ' + cls + '">' + value + '</span>' +
+      '</div>';
+
+    let html = '';
+    html += row('RSS / Feed', ps.hasRSS ? (ps.feeds && ps.feeds[0] && ps.feeds[0].title || 'Feed') : 'Nao detectado', ps.hasRSS ? 'sbadge-ok' : 'sbadge-warn');
+    html += row('Paginacao', (ps.hasPrev || ps.hasNext) ? ((ps.hasPrev ? '← Ant' : '') + (ps.hasPrev && ps.hasNext ? ' + ' : '') + (ps.hasNext ? 'Pro →' : '')) : 'Sem rel prev/next', (ps.hasPrev || ps.hasNext) ? 'sbadge-ok' : 'sbadge-warn');
+    html += row('Breadcrumb Schema', ps.hasBreadcrumb ? 'Presente' : 'Ausente', ps.hasBreadcrumb ? 'sbadge-ok' : 'sbadge-warn');
+    html += row('FAQ Schema', ps.hasFAQ ? 'Presente' : 'Ausente', ps.hasFAQ ? 'sbadge-ok' : 'sbadge-info');
+    html += row('Article Schema', ps.hasArticle ? 'Presente' : 'Ausente', ps.hasArticle ? 'sbadge-ok' : 'sbadge-info');
+    html += row('Product Schema', ps.hasProduct ? 'Presente' : 'Ausente', ps.hasProduct ? 'sbadge-ok' : 'sbadge-info');
+    html += row('LocalBusiness Schema', ps.hasLocalBusiness ? 'Presente' : 'Ausente', ps.hasLocalBusiness ? 'sbadge-ok' : 'sbadge-info');
+    if (ps.hasOrganization) html += row('Organization Schema', 'Presente', 'sbadge-ok');
+    if (ps.hasHowTo) html += row('HowTo Schema', 'Presente', 'sbadge-ok');
+    if (ps.hasEvent) html += row('Event Schema', 'Presente', 'sbadge-ok');
+
+    el.innerHTML = html;
   }
 
   // ── Meta Tags card ──────────────────────────────────────────
@@ -407,6 +584,8 @@ class PopupManager {
     const perf = d.performance || {};
     const og   = meta.og || {};
     const cq   = d.contentQuality || {};
+    const kp   = d.keywordProminence || {};
+    const ps   = d.pageStructure || {};
 
     const checks = [
       // ── Meta ──────────────────────────────────────────────
@@ -515,6 +694,46 @@ class PopupManager {
         msg: (cq.poorAnchorTexts || 0) === 0
           ? 'Nenhum ancora generico detectado'
           : (cq.poorAnchorTexts) + ' ancora(s) genericos ("clique aqui", "saiba mais", etc.)' },
+
+      // ── Keyword Prominence ─────────────────────────────────────
+      ...(kp.mainKeyword ? [
+        { group: 'Keyword', label: 'Palavra-chave no Title',
+          status: kp.keywordInTitle ? 'good' : 'warn',
+          msg: kp.keywordInTitle
+            ? '"' + kp.mainKeyword + '" encontrada no title'
+            : '"' + kp.mainKeyword + '" ausente no title — impacto no CTR' },
+
+        { group: 'Keyword', label: 'Palavra-chave na Description',
+          status: kp.keywordInDesc ? 'good' : 'warn',
+          msg: kp.keywordInDesc
+            ? '"' + kp.mainKeyword + '" encontrada na meta description'
+            : '"' + kp.mainKeyword + '" ausente na description' },
+
+        { group: 'Keyword', label: 'Palavra-chave no H1',
+          status: kp.keywordInH1 ? 'good' : 'bad',
+          msg: kp.keywordInH1
+            ? '"' + kp.mainKeyword + '" encontrada no H1'
+            : '"' + kp.mainKeyword + '" ausente no H1 — fator critico de relevancia' },
+
+        { group: 'Keyword', label: 'Densidade de Keyword',
+          status: kp.keywordDensity >= 0.5 && kp.keywordDensity <= 3 ? 'good' : kp.keywordDensity < 0.5 ? 'warn' : 'warn',
+          msg: kp.keywordDensity + '% de densidade (ideal: 0.5%–3%)' },
+      ] : []),
+
+      // ── Estrutura ──────────────────────────────────────────────
+      ...((ps) => [
+        { group: 'Estrutura', label: 'Breadcrumb Schema',
+          status: ps.hasBreadcrumb ? 'good' : 'warn',
+          msg: ps.hasBreadcrumb ? 'BreadcrumbList detectado' : 'Sem Breadcrumb Schema — rich snippets de caminho ausentes' },
+
+        { group: 'Estrutura', label: 'RSS / Feed',
+          status: ps.hasRSS ? 'good' : 'warn',
+          msg: ps.hasRSS ? ps.feeds[0].title : 'Feed RSS nao detectado' },
+
+        { group: 'Estrutura', label: 'Paginacao (prev/next)',
+          status: (ps.hasPrev || ps.hasNext) ? 'good' : 'warn',
+          msg: (ps.hasPrev || ps.hasNext) ? 'Links rel=prev/next configurados' : 'Sem links de paginacao — possivel conteudo duplicado em series' },
+      ])(d.pageStructure || {}),
     ];
 
     const icons = { good: '&#10003;', warn: '!', bad: '&#10005;' };
@@ -765,6 +984,8 @@ class PopupManager {
     document.getElementById('statReading').textContent    = kw.readingTime || 0;
     document.getElementById('statParagraphs').textContent = kw.paragraphs || 0;
 
+    this.renderReadability();
+
     const keywords = kw.topKeywords || [];
     if (keywords.length === 0) {
       document.getElementById('keywordsTable').innerHTML = '<p class="empty-msg">Nenhuma palavra-chave identificada.</p>';
@@ -779,6 +1000,37 @@ class PopupManager {
         '<span class="kw-count">' + item.count + 'x</span>' +
       '</div>'
     ).join('');
+  }
+
+  renderReadability() {
+    const el = document.getElementById('readabilityStats');
+    if (!el) return;
+    const r = this.data.readability || {};
+
+    if (!r.fleschScore && r.fleschScore !== 0) {
+      el.innerHTML = '<p class="empty-msg">Conteudo insuficiente para analise de legibilidade.</p>';
+      return;
+    }
+
+    const pct  = r.fleschScore;
+    const cls  = pct >= 70 ? 'r-easy' : pct >= 50 ? 'r-medium' : 'r-hard';
+    const tCls = pct >= 70 ? 'val-ok' : pct >= 50 ? 'val-warn' : 'val-bad';
+
+    el.innerHTML =
+      '<div class="url-row">' +
+        '<span class="url-lbl">Score Flesch</span>' +
+        '<span class="url-val ' + tCls + '">' + pct + ' / 100</span>' +
+      '</div>' +
+      '<div class="readability-bar"><div class="readability-fill ' + cls + '" style="width:' + pct + '%"></div></div>' +
+      '<div class="readability-labels"><span>Muito difícil</span><span>Médio</span><span>Fácil</span></div>' +
+      '<div class="url-row" style="margin-top:6px">' +
+        '<span class="url-lbl">Nivel</span>' +
+        '<span class="url-val ' + tCls + '">' + (r.level || '--') + '</span>' +
+      '</div>' +
+      '<div class="url-row">' +
+        '<span class="url-lbl">Palavras/frase (media)</span>' +
+        '<span class="url-val ' + ((r.avgWordsPerSentence || 0) <= 20 ? 'val-ok' : (r.avgWordsPerSentence || 0) <= 30 ? 'val-warn' : 'val-bad') + '">' + (r.avgWordsPerSentence || '--') + '</span>' +
+      '</div>';
   }
 
   // ─── PLAN TAB ────────────────────────────────────────────────
@@ -816,6 +1068,9 @@ class PopupManager {
     const perf = d.performance || {};
     const og   = meta.og || {};
     const cq   = d.contentQuality || {};
+    const kp   = d.keywordProminence || {};
+    const ps   = d.pageStructure || {};
+    const t    = d.timing || {};
     const isHTTPS  = url.isHTTPS || (d.technical && d.technical.isHTTPS);
     const isMobile = meta.hasViewport || (d.technical && d.technical.mobile);
     const acts = [];
@@ -901,6 +1156,35 @@ class PopupManager {
     if (!meta.lang)
       acts.push({ p: 'recomendado', impact: 'Baixo', text: "Adicionar atributo lang na tag <html> (ex: lang='pt-BR'). Ajuda buscadores a identificar o idioma da pagina." });
 
+    // ── Keyword Prominence ─────────────────────────────────────────
+    if (kp.mainKeyword) {
+      if (!kp.keywordInH1)
+        acts.push({ p: 'critico', impact: 'Alto', text: 'Incluir a palavra-chave principal "' + kp.mainKeyword + '" no H1. O H1 e o sinal de relevancia mais forte para o Google.' });
+
+      if (!kp.keywordInTitle)
+        acts.push({ p: 'importante', impact: 'Alto', text: 'Incluir "' + kp.mainKeyword + '" no title tag. O title e o principal fator de CTR nos resultados de busca.' });
+
+      if (!kp.keywordInDesc)
+        acts.push({ p: 'recomendado', impact: 'Medio', text: 'Incluir "' + kp.mainKeyword + '" na meta description. Aumenta o CTR ao destacar a palavra no resultado de busca.' });
+
+      if (kp.keywordDensity > 3)
+        acts.push({ p: 'recomendado', impact: 'Medio', text: 'Reduzir a densidade de "' + kp.mainKeyword + '" (' + kp.keywordDensity + '%). Acima de 3% pode sinalizar keyword stuffing para o Google.' });
+    }
+
+    // ── Page Structure ─────────────────────────────────────────────
+    if (!ps.hasBreadcrumb && (meta.schemaCount || 0) > 0)
+      acts.push({ p: 'recomendado', impact: 'Medio', text: 'Adicionar BreadcrumbList ao Schema.org. Exibe o caminho de navegacao diretamente nos resultados de busca (rich snippet).' });
+
+    // ── Performance Timing ─────────────────────────────────────────
+    if (t.ttfb && t.ttfb > 600)
+      acts.push({ p: 'importante', impact: 'Alto', text: 'TTFB de ' + t.ttfb + 'ms esta acima do ideal (< 200ms). Investigar lentidao no servidor, cache, CDN e otimizacoes de backend.' });
+
+    if (t.loadComplete && t.loadComplete > 5000)
+      acts.push({ p: 'importante', impact: 'Alto', text: 'Tempo de carregamento de ' + (t.loadComplete/1000).toFixed(1) + 's esta critico (ideal < 3s). Otimizar recursos, usar lazy loading e CDN.' });
+
+    if (t.domNodes && t.domNodes > 3000)
+      acts.push({ p: 'recomendado', impact: 'Medio', text: 'DOM com ' + t.domNodes + ' nos pode impactar o rendering. Google recomenda menos de 1500 elementos DOM.' });
+
     return acts;
   }
 
@@ -910,15 +1194,18 @@ class PopupManager {
     const checks = this.data && document.querySelectorAll('.check-item.border-bad, .check-item.border-warn');
     const issues  = checks ? Array.from(checks).filter(c => c.classList.contains('border-bad')).length : 0;
     const actions = document.getElementById('actionPlan').children.length;
-    const tagsCount = (this.data.tags || []).length;
+    const tagsCount      = (this.data.tags || []).length;
     const redirectsCount = ((this.data.links || {}).redirects || []).length;
     const techCount      = (this.data.technologies || []).length;
+    const kp = this.data.keywordProminence || {};
+    const kpIssues = [!kp.keywordInTitle, !kp.keywordInDesc, !kp.keywordInH1].filter(Boolean).length;
 
-    this.setBadge('badge-seo',   issues,        'red');
-    this.setBadge('badge-tags',  tagsCount,     'blue');
-    this.setBadge('badge-links', redirectsCount,'orange');
-    this.setBadge('badge-tech',  techCount,     'blue');
-    this.setBadge('badge-plan',  actions,       'red');
+    this.setBadge('badge-seo',     issues,         'red');
+    this.setBadge('badge-tags',    tagsCount,      'blue');
+    this.setBadge('badge-links',   redirectsCount, 'orange');
+    this.setBadge('badge-tech',    techCount,      'blue');
+    this.setBadge('badge-content', kpIssues,       'orange');
+    this.setBadge('badge-plan',    actions,        'red');
   }
 
   setBadge(id, count, color) {
