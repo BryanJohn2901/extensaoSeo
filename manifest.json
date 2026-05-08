@@ -39,7 +39,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["src/report/report.html"],
+      "resources": ["dist/*.js"],
       "matches": ["<all_urls>"]
     }
   ]
