@@ -303,18 +303,31 @@
 
     </div><!-- /main -->
 
-    <!-- PROMPT MODAL (dentro do container para empilhamento consistente) -->
+    <!-- PROMPT MODAL -->
     <div id="promptModal" class="modal-overlay" style="display:none">
         <div class="modal-box">
+
             <div class="modal-header">
-                <span class="modal-title">Prompt para IA</span>
-                <button id="modalClose" class="icon-btn modal-close-btn" title="Fechar">&#x2715;</button>
+                <div class="modal-header-left">
+                    <span class="modal-title">Prompt para IA</span>
+                    <span class="modal-sub">Cole em ChatGPT, Claude ou Gemini</span>
+                </div>
+                <button id="modalClose" class="modal-close-btn" title="Fechar">&#x2715;</button>
             </div>
-            <p class="modal-sub">Copie e cole em qualquer IA (ChatGPT, Claude, Gemini...)</p>
+
+            <div class="modal-chips">
+                <span class="modal-chip chip-gpt">ChatGPT</span>
+                <span class="modal-chip chip-claude">Claude</span>
+                <span class="modal-chip chip-gemini">Gemini</span>
+                <span id="promptCharCount" class="modal-chip chip-count"></span>
+            </div>
+
             <textarea id="promptText" class="prompt-textarea" readonly></textarea>
+
             <div class="modal-actions">
-                <button id="copyPromptBtn" class="btn btn-primary">Copiar Prompt</button>
+                <button id="copyPromptBtn" class="btn btn-primary btn-copy">Copiar Prompt</button>
             </div>
+
         </div>
     </div>
 

@@ -1238,7 +1238,14 @@ class PopupManager {
 
   openPromptModal() {
     if (!this.data) return;
-    document.getElementById('promptText').value = this.generateAIPrompt();
+    const prompt = this.generateAIPrompt();
+    document.getElementById('promptText').value = prompt;
+    const countEl = document.getElementById('promptCharCount');
+    if (countEl) {
+      const chars = prompt.length;
+      const lines = prompt.split('\n').length;
+      countEl.textContent = chars.toLocaleString('pt-BR') + ' chars · ' + lines + ' linhas';
+    }
     document.getElementById('promptModal').style.display = 'flex';
   }
 
@@ -1246,19 +1253,19 @@ class PopupManager {
     document.getElementById('promptModal').style.display = 'none';
     const btn = document.getElementById('copyPromptBtn');
     btn.textContent = 'Copiar Prompt';
-    btn.className = 'btn btn-primary';
+    btn.className = 'btn btn-primary btn-copy';
   }
 
   copyPrompt() {
     const text = document.getElementById('promptText').value;
     navigator.clipboard.writeText(text).then(() => {
       const btn = document.getElementById('copyPromptBtn');
-      btn.textContent = 'Copiado!';
-      btn.className = 'btn btn-copied';
+      btn.textContent = '✓ Copiado!';
+      btn.className = 'btn btn-copied btn-copy';
       setTimeout(() => {
         btn.textContent = 'Copiar Prompt';
-        btn.className = 'btn btn-primary';
-      }, 2000);
+        btn.className = 'btn btn-primary btn-copy';
+      }, 2500);
     });
   }
 
